@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>FSD Flächenkarten Cloud V4</title>
+<title>FSD Flächenkarten Cloud V5</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:Arial;background:#eef2f4;color:#1f2937}
@@ -13,8 +13,9 @@ table{width:100%;border-collapse:collapse;background:#fff}th,td{padding:9px;bord
 th{background:#f3f5f7}.badge{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700}.draft{background:#fff3cd;color:#735b00}
 .released{background:#d1fae5;color:#065f46}#mapView{display:none;position:fixed;inset:0;z-index:50;background:#fff}iframe{width:100%;height:100%;border:0}
 #loginBox{max-width:520px;margin:50px auto}#app{display:none}@media(max-width:760px){main{padding:8px}.hide-mobile{display:none}th,td{padding:6px 4px;font-size:11px}}
+.pointEditor{border:1px solid #cbd5e1;border-radius:12px;max-width:560px;width:90vw;padding:22px}.pointEditor::backdrop{background:#0006}button:disabled{opacity:.5;cursor:wait}#dashboardMsg{padding:10px;color:#b91c1c}@media(max-width:760px){header b{font-size:13px}td:last-child{min-width:104px}.card:has(table){overflow:auto!important}}
 </style></head><body>
-<header><b>FSD Navigator · Flächenkarten Cloud V4</b><span id="userLabel" class="muted" style="color:#cbd5e1"></span></header>
+<header><b>FSD Navigator · Flächenkarten Cloud V5</b><span id="userLabel" class="muted" style="color:#cbd5e1"></span></header>
 
 <div id="loginBox" class="card">
 <h3>Cloud-Anmeldung</h3>
@@ -25,14 +26,16 @@ th{background:#f3f5f7}.badge{padding:3px 8px;border-radius:999px;font-size:11px;
 </div>
 
 <div id="app"><main>
-<div class="card"><div class="row" style="justify-content:space-between"><div><b>FSD Flughafenkarte</b><div class="muted">Hauptkarte · Supabase Cloud</div></div>
-<div class="row"><button class="primary" onclick="openMaster()">+ Neue Karte</button><button class="secondary" onclick="loadMaps()">↻ Aktualisieren</button><button class="secondary" onclick="logout()">Abmelden</button></div></div></div>
+<div class="card"><div class="row" style="justify-content:space-between"><div><b>FSD Kartenverwaltung</b><div class="muted">Flughafen und Anlagen · Supabase Cloud</div></div>
+<div class="row"><button class="primary" onclick="openMaster()">+ Flughafenkarte</button><button class="primary" onclick="openPointEditor()">+ 50-Hz-Anlagenkarte</button><button class="secondary" onclick="loadMaps()">↻ Aktualisieren</button><button class="secondary" onclick="logout()">Abmelden</button></div></div></div>
+<div id="dashboardMsg" role="status"></div>
 <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Name</th><th>Status</th><th>Offen</th><th>Abgearbeitet</th><th class="hide-mobile">Gesamt</th><th class="hide-mobile">Verschickt an</th><th>Aktionen</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="muted">Die Kartenliste, Flächenzuordnung und Rückmeldungen werden jetzt in Supabase gespeichert.</div>
 </main></div>
 
 <div id="mapView"><iframe id="mapFrame"></iframe></div>
 
+<script src="point-manager.js"></script>
 <script>
 const SUPABASE_URL="https://ermkdluipeobbpzuqixz.supabase.co", SUPABASE_KEY="sb_publishable_pN4WhH01n-cM_YBPucxzDw_Zd1Oi3au";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -74,15 +77,24 @@ async function loadMaps(){
    let a=await sb.from('map_areas').select('map_id,fsd_id,hidden').in('map_id',ids); if(!a.error)areas=a.data||[];
    let f=await sb.from('feedback').select('map_id,fsd_id,mowed').in('map_id',ids); if(!f.error)feedback=f.data||[];
  }
+ const pointIds=maps.filter(isPointCard).map(c=>c.id);let pointFeedback=[];
+ if(pointIds.length){const r=await sb.from('fsd_point_feedback').select('map_id,point_id,payload').in('map_id',pointIds);
+   if(r.error){document.getElementById('dashboardMsg').textContent='Anlagen-Rückmeldungen konnten nicht geladen werden. Bitte Cloud-Erweiterung und Verbindung prüfen.';return;}pointFeedback=r.data||[];}
+ document.getElementById('dashboardMsg').textContent='';
  const tb=document.getElementById('rows');tb.innerHTML='';
  if(!maps.length){tb.innerHTML='<tr><td colspan="7" class="muted">Noch keine Cloud-Karte vorhanden.</td></tr>';return}
  maps.forEach(c=>{
    const aa=areas.filter(a=>a.map_id===c.id && !a.hidden), ff=feedback.filter(f=>f.map_id===c.id);
-   const done=new Set(ff.filter(f=>f.mowed).map(f=>f.fsd_id)).size,total=aa.length,open=Math.max(0,total-done);
+   const ids=new Set(aa.map(a=>a.fsd_id));
+   const points=isPointCard(c)?c.filters.points||[]:[],pids=new Set(points.map(p=>p.point_id));
+   const total=isPointCard(c)?points.length:aa.length;
+   const done=isPointCard(c)?new Set(pointFeedback.filter(f=>f.map_id===c.id&&pids.has(f.point_id)&&f.payload?.status==='Erledigt').map(f=>f.point_id)).size:new Set(ff.filter(f=>f.mowed&&ids.has(f.fsd_id)).map(f=>f.fsd_id)).size;
+   const open=Math.max(0,total-done);
    let status=c.status==='draft'?'Entwurf':c.status==='released'?'Freigegeben':c.status==='in_progress'?'In Bearbeitung':'Abgeschlossen';
    let tr=document.createElement('tr');
-   tr.innerHTML=`<td><b>${esc(c.name)}</b></td><td><span class="badge ${c.status==='draft'?'draft':'released'}">${status}</span></td><td><b>${open}</b></td><td><b>${done}</b></td><td class="hide-mobile">${total}</td><td class="hide-mobile">${esc(c.recipient||'–')}</td><td></td>`;
+   tr.innerHTML=`<td><b>${esc(c.name)}</b><div class="muted">${isPointCard(c)?'Anlagen / Positionen':'Flughafen / Flächen'}</div></td><td><span class="badge ${c.status==='draft'?'draft':'released'}">${status}</span></td><td><b>${open}</b></td><td><b>${done}</b></td><td class="hide-mobile">${total}</td><td class="hide-mobile">${esc(c.recipient||'–')}</td><td></td>`;
    let td=tr.lastElementChild;
+   if(isPointCard(c))btn(td,'Ansehen','secondary',()=>viewPointCard(c));
    if(c.status==='draft'){btn(td,'Bearbeiten','secondary',()=>editCard(c.id));btn(td,'Freigeben','primary',()=>releaseCard(c.id));}
    else{btn(td,'Teilen','primary',()=>shareCard(c.id));btn(td,'Neue Version','secondary',()=>duplicateCard(c.id));}
    btn(td,'Löschen','secondary',()=>trashCard(c.id));
@@ -92,6 +104,7 @@ async function loadMaps(){
 function openMaster(){editingId=null;showMap(null)}
 async function editCard(id){
  const c=maps.find(x=>x.id===id); if(!c)return;
+ if(isPointCard(c)){await openPointEditor(c);return;}
  const {data,error}=await sb.from('map_areas').select('*').eq('map_id',id);
  if(error){alert(error.message);return}
  const hidden=(data||[]).filter(a=>a.hidden).map(a=>a.fsd_id);
@@ -105,6 +118,7 @@ function showMap(c){
  fr.src='mastermap.html?x='+Date.now();
 }
 window.addEventListener('message',async e=>{
+ if(e.source!==document.getElementById('mapFrame').contentWindow||e.origin!==location.origin)return;
  const m=e.data||{};
  if(m.type==='backToDashboard'){document.getElementById('mapView').style.display='none';await loadMaps()}
  if(m.type==='saveDraft')await saveDraft(m.name,m.snapshot);
@@ -126,7 +140,7 @@ async function saveDraft(name,snapshot){
  }catch(err){alert('Speichern fehlgeschlagen: '+err.message)}
 }
 async function releaseCard(id){
- const recipient=prompt('Verschickt an / Truppname:','')||'';
+ const recipient=prompt('Verschickt an / Truppname:','');if(recipient===null)return;
  let u=await sb.from('maps').update({status:'released',recipient,sent_at:new Date().toISOString()}).eq('id',id);if(u.error){alert(u.error.message);return}
  let existing=await sb.from('share_links').select('token').eq('map_id',id).eq('active',true).maybeSingle();
  if(existing.error){alert(existing.error.message);return}
@@ -137,11 +151,13 @@ async function shareCard(id){
  let r=await sb.from('share_links').select('token').eq('map_id',id).eq('active',true).maybeSingle();
  if(r.error||!r.data){alert(r.error?.message||'Kein Freigabelink vorhanden.');return}
  const base=location.href.replace(/index\.html.*$/,'').replace(/[?#].*$/,'');
- const link=base+'truppkarte.html?t='+encodeURIComponent(r.data.token);
+ const card=maps.find(c=>c.id===id);
+ const link=base+(isPointCard(card)?'handykarte.html':'truppkarte.html')+'?t='+encodeURIComponent(r.data.token);
  try{await navigator.clipboard.writeText(link);alert('Link kopiert:\n'+link)}catch{prompt('Diesen Link kopieren:',link)}
 }
 async function duplicateCard(id){
  const c=maps.find(x=>x.id===id);if(!c)return;
+ if(isPointCard(c)){await openPointEditor(c,true);return;}
  const a=await sb.from('map_areas').select('*').eq('map_id',id);if(a.error){alert(a.error.message);return}
  let n=await sb.from('maps').insert({name:c.name+' – neue Version',status:'draft',filters:c.filters||{}}).select('id').single();if(n.error){alert(n.error.message);return}
  const rows=(a.data||[]).map(x=>({map_id:n.data.id,fsd_id:x.fsd_id,work_id:x.work_id,measure_code:x.measure_code,los:x.los,area_m2:x.area_m2,hidden:x.hidden}));
@@ -151,4 +167,5 @@ async function duplicateCard(id){
 async function trashCard(id){if(!confirm('Karte in den Papierkorb verschieben?'))return;let r=await sb.from('maps').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)alert(r.error.message);else loadMaps()}
 sb.auth.onAuthStateChange((_e,s)=>showSession(s));
 init();
+setInterval(()=>{if(!document.hidden&&document.getElementById('app').style.display==='block'&&document.getElementById('mapView').style.display!=='block')loadMaps()},30000);
 </script></body></html>
