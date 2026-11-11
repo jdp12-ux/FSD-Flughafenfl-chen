@@ -26,8 +26,8 @@ th{background:#f3f5f7}.badge{padding:3px 8px;border-radius:999px;font-size:11px;
 </div>
 
 <div id="app"><main>
-<div class="card"><div class="row" style="justify-content:space-between"><div><b>FSD Kartenverwaltung</b><div class="muted">Flughafen und Anlagen · Supabase Cloud</div></div>
-<div class="row"><button class="primary" onclick="openMaster()">+ Flughafenkarte</button><button class="primary" onclick="openPointEditor()">+ 50-Hz-Anlagenkarte</button><button class="secondary" onclick="loadMaps()">↻ Aktualisieren</button><button class="secondary" onclick="logout()">Abmelden</button></div></div></div>
+<div class="card"><div class="row" style="justify-content:space-between"><div><b>FSD Kartenverwaltung</b><div class="muted">Flughafen, Anlagen und Handykarten · Supabase Cloud</div></div>
+<div class="row"><button class="primary" onclick="openMaster()">+ Flughafenkarte</button><button class="primary" onclick="openPointEditor()">+ 50-Hz-Anlagenkarte</button><button class="primary" onclick="document.getElementById('fsdHtmlUpload').click()">+ FSD-Handykarte</button><input id="fsdHtmlUpload" type="file" accept=".html,text/html" hidden onchange="uploadFsdHandykarte(this)"><button class="secondary" onclick="loadMaps()">↻ Aktualisieren</button><button class="secondary" onclick="logout()">Abmelden</button></div></div></div>
 <div id="dashboardMsg" role="status"></div>
 <div class="card" style="padding:0;overflow:hidden"><table><thead><tr><th>Name</th><th>Status</th><th>Offen</th><th>Abgearbeitet</th><th class="hide-mobile">Gesamt</th><th class="hide-mobile">Verschickt an</th><th>Aktionen</th></tr></thead><tbody id="rows"></tbody></table></div>
 <div class="muted">Die Kartenliste, Flächenzuordnung und Rückmeldungen werden jetzt in Supabase gespeichert.</div>
@@ -77,7 +77,7 @@ async function loadMaps(){
    let a=await sb.from('map_areas').select('map_id,fsd_id,hidden').in('map_id',ids); if(!a.error)areas=a.data||[];
    let f=await sb.from('feedback').select('map_id,fsd_id,mowed').in('map_id',ids); if(!f.error)feedback=f.data||[];
  }
- const pointIds=maps.filter(isPointCard).map(c=>c.id);let pointFeedback=[];
+ const pointIds=maps.filter(c=>!isFsdHtmlCard(c)&&isPointCard(c)).map(c=>c.id);let pointFeedback=[];
  if(pointIds.length){const r=await sb.from('fsd_point_feedback').select('map_id,point_id,payload').in('map_id',pointIds);
    if(r.error){document.getElementById('dashboardMsg').textContent='Anlagen-Rückmeldungen konnten nicht geladen werden. Bitte Cloud-Erweiterung und Verbindung prüfen.';return;}pointFeedback=r.data||[];}
  document.getElementById('dashboardMsg').textContent='';
@@ -86,17 +86,17 @@ async function loadMaps(){
  maps.forEach(c=>{
    const aa=areas.filter(a=>a.map_id===c.id && !a.hidden), ff=feedback.filter(f=>f.map_id===c.id);
    const ids=new Set(aa.map(a=>a.fsd_id));
-   const points=isPointCard(c)?c.filters.points||[]:[],pids=new Set(points.map(p=>p.point_id));
-   const total=isPointCard(c)?points.length:aa.length;
-   const done=isPointCard(c)?new Set(pointFeedback.filter(f=>f.map_id===c.id&&pids.has(f.point_id)&&f.payload?.status==='Erledigt').map(f=>f.point_id)).size:new Set(ff.filter(f=>f.mowed&&ids.has(f.fsd_id)).map(f=>f.fsd_id)).size;
+   const points=!isFsdHtmlCard(c)&&isPointCard(c)?c.filters.points||[]:[],pids=new Set(points.map(p=>p.point_id));
+   const total=isFsdHtmlCard(c)?Number(c.filters?.count||0):isPointCard(c)?points.length:aa.length;
+   const done=isFsdHtmlCard(c)?0:isPointCard(c)?new Set(pointFeedback.filter(f=>f.map_id===c.id&&pids.has(f.point_id)&&f.payload?.status==='Erledigt').map(f=>f.point_id)).size:new Set(ff.filter(f=>f.mowed&&ids.has(f.fsd_id)).map(f=>f.fsd_id)).size;
    const open=Math.max(0,total-done);
    let status=c.status==='draft'?'Entwurf':c.status==='released'?'Freigegeben':c.status==='in_progress'?'In Bearbeitung':'Abgeschlossen';
    let tr=document.createElement('tr');
-   tr.innerHTML=`<td><b>${esc(c.name)}</b><div class="muted">${isPointCard(c)?'Anlagen / Positionen':'Flughafen / Flächen'}</div></td><td><span class="badge ${c.status==='draft'?'draft':'released'}">${status}</span></td><td><b>${open}</b></td><td><b>${done}</b></td><td class="hide-mobile">${total}</td><td class="hide-mobile">${esc(c.recipient||'–')}</td><td></td>`;
+   tr.innerHTML=`<td><b>${esc(c.name)}</b><div class="muted">${isFsdHtmlCard(c)?'FSD-Handykarte / HTML':isPointCard(c)?'Anlagen / Positionen':'Flughafen / Flächen'}</div></td><td><span class="badge ${c.status==='draft'?'draft':'released'}">${status}</span></td><td><b>${open}</b></td><td><b>${done}</b></td><td class="hide-mobile">${total}</td><td class="hide-mobile">${esc(c.recipient||'–')}</td><td></td>`;
    let td=tr.lastElementChild;
-   if(isPointCard(c))btn(td,'Ansehen','secondary',()=>viewPointCard(c));
-   if(c.status==='draft'){btn(td,'Bearbeiten','secondary',()=>editCard(c.id));btn(td,'Freigeben','primary',()=>releaseCard(c.id));}
-   else{btn(td,'Teilen','primary',()=>shareCard(c.id));btn(td,'Neue Version','secondary',()=>duplicateCard(c.id));}
+   if(isFsdHtmlCard(c))btn(td,'Ansehen','secondary',()=>openFsdHtmlCard(c.id));else if(isPointCard(c))btn(td,'Ansehen','secondary',()=>viewPointCard(c));
+   if(isFsdHtmlCard(c)){btn(td,'Link kopieren','primary',()=>shareFsdHtmlCard(c.id));btn(td,'HTML ersetzen','secondary',()=>replaceFsdHtmlCard(c.id));}else if(c.status==='draft'){btn(td,'Bearbeiten','secondary',()=>editCard(c.id));btn(td,'Freigeben','primary',()=>releaseCard(c.id));}
+   else if(!isFsdHtmlCard(c)){btn(td,'Teilen','primary',()=>shareCard(c.id));btn(td,'Neue Version','secondary',()=>duplicateCard(c.id));}
    btn(td,'Löschen','secondary',()=>trashCard(c.id));
    tb.appendChild(tr);
  });
@@ -104,6 +104,7 @@ async function loadMaps(){
 function openMaster(){editingId=null;showMap(null)}
 async function editCard(id){
  const c=maps.find(x=>x.id===id); if(!c)return;
+ if(isFsdHtmlCard(c)){await replaceFsdHtmlCard(c.id);return;}
  if(isPointCard(c)){await openPointEditor(c);return;}
  const {data,error}=await sb.from('map_areas').select('*').eq('map_id',id);
  if(error){alert(error.message);return}
@@ -165,6 +166,46 @@ async function duplicateCard(id){
  await loadMaps();editCard(n.data.id);
 }
 async function trashCard(id){if(!confirm('Karte in den Papierkorb verschieben?'))return;let r=await sb.from('maps').update({deleted_at:new Date().toISOString()}).eq('id',id);if(r.error)alert(r.error.message);else loadMaps()}
+
+// Zusätzliche FSD-HTML-Karten; bestehende Flughafen-/50Hz-Logik bleibt unberührt.
+function isFsdHtmlCard(c){return c?.filters?.fsd_type==='html_handykarte'}
+function cloudBase(){return new URL('./',location.href).href}
+async function shareFsdHtmlCard(id){
+ const link=cloudBase()+'fsd-handykarte-viewer.html?id='+encodeURIComponent(id);
+ try{await navigator.clipboard.writeText(link);alert('Link kopiert. Der Empfänger muss sich mit einem freigeschalteten Supabase-Konto anmelden.\n'+link)}catch{prompt('Link kopieren (Anmeldung erforderlich):',link)}
+}
+function openFsdHtmlCard(id){window.open('fsd-handykarte-viewer.html?id='+encodeURIComponent(id),'_blank','noopener')}
+async function replaceFsdHtmlCard(id){
+ const el=document.createElement('input');el.type='file';el.accept='.html,text/html';
+ el.onchange=()=>uploadFsdHandykarte(el,id);el.click();
+}
+async function uploadFsdHandykarte(input,existingId=null){
+ const file=input.files?.[0];if(!file)return;
+ input.value='';
+ if(!/\.html?$/i.test(file.name)){alert('Bitte eine HTML-Datei auswählen.');return}
+ if(file.size>15*1024*1024){alert('HTML-Datei zu groß (maximal 15 MB).');return}
+ const name=existingId?maps.find(c=>c.id===existingId)?.name:prompt('Name der neuen FSD-Handykarte:',file.name.replace(/\.html?$/i,''));
+ if(!name)return;
+ const msg=document.getElementById('dashboardMsg');msg.textContent='Handykarte wird geschützt hochgeladen …';
+ let id=existingId,storagePath=null;
+ try{
+   const html=await file.text();
+   if(!/<html[\s>]/i.test(html)||!/<\/html>/i.test(html))throw Error('Die Datei enthält keine vollständige HTML-Karte.');
+   const count=Number(html.match(/\b\d+\s+(?:Punkte|Positionen|poziții)/i)?.[0]?.match(/\d+/)?.[0]||0);
+   if(!id){
+     const r=await sb.from('maps').insert({name,status:'draft',filters:{fsd_type:'html_handykarte',count}}).select('id').single();
+     if(r.error)throw r.error;id=r.data.id;
+   }
+   storagePath=id+'/karte.html';
+   const up=await sb.storage.from('fsd-handykarten').upload(storagePath,new Blob([html],{type:'text/html;charset=utf-8'}),{upsert:true,contentType:'text/html;charset=utf-8',cacheControl:'0'});
+   if(up.error)throw up.error;
+   const u=await sb.from('maps').update({name,status:'released',filters:{fsd_type:'html_handykarte',storage_path:storagePath,count}}).eq('id',id);
+   if(u.error)throw u.error;
+   msg.textContent='Handykarte gespeichert. Öffnen oder Link kopieren (Anmeldung erforderlich).';
+   await loadMaps();
+ }catch(e){msg.textContent='Upload fehlgeschlagen: '+e.message+' — SQL-Einrichtung und Storage-Berechtigungen prüfen.';alert(msg.textContent)}
+}
+
 sb.auth.onAuthStateChange((_e,s)=>showSession(s));
 init();
 setInterval(()=>{if(!document.hidden&&document.getElementById('app').style.display==='block'&&document.getElementById('mapView').style.display!=='block')loadMaps()},30000);

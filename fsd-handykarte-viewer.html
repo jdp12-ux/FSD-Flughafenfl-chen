@@ -1,0 +1,22 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FSD · Geschützte Handykarte</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>body{margin:0;font:15px Arial;background:#edf2f5;color:#17212b}#bar{padding:10px;background:#182027;color:white;display:flex;align-items:center;gap:10px;flex-wrap:wrap}input,button{padding:10px;border-radius:7px;border:1px solid #aaa}button{cursor:pointer}#login{padding:24px;max-width:460px;margin:35px auto;background:white;border-radius:12px}#viewer{display:none;height:calc(100dvh - 58px);width:100%;border:0}#status{padding:10px}</style></head><body><div id="bar"><b>FSD · Geschützte Handykarte</b><span id="who"></span><button id="logout" hidden onclick="logout()">Abmelden</button></div><section id="login"><h3>Anmeldung erforderlich</h3><p>Nur freigeschaltete FSD-Benutzer können diese Karte öffnen.</p><input id="email" type="email" placeholder="E-Mail"><input id="password" type="password" placeholder="Passwort"><button onclick="login()">Anmelden</button><p id="error"></p></section><div id="status"></div><iframe id="viewer" sandbox="allow-scripts allow-downloads allow-forms allow-modals" referrerpolicy="no-referrer" title="FSD Handykarte"></iframe><script>
+const sb=supabase.createClient('https://ermkdluipeobbpzuqixz.supabase.co','sb_publishable_pN4WhH01n-cM_YBPucxzDw_Zd1Oi3au');
+const id=new URLSearchParams(location.search).get('id');let currentUrl=null;
+async function login(){let r=await sb.auth.signInWithPassword({email:document.getElementById('email').value.trim(),password:document.getElementById('password').value});if(r.error)document.getElementById('error').textContent=r.error.message;else load()}
+async function logout(){await sb.auth.signOut();if(currentUrl)URL.revokeObjectURL(currentUrl);location.reload()}
+async function load(){
+ const {data:{session}}=await sb.auth.getSession();if(!session){document.getElementById('login').hidden=false;return}
+ document.getElementById('login').hidden=true;document.getElementById('who').textContent=session.user.email;document.getElementById('logout').hidden=false;
+ const status=document.getElementById('status');status.textContent='Karte wird geladen …';
+ if(!id){status.textContent='Karten-ID fehlt.';return}
+ const r=await sb.from('maps').select('name,filters,deleted_at').eq('id',id).is('deleted_at',null).single();
+ if(r.error||r.data?.filters?.fsd_type!=='html_handykarte'){status.textContent='Karte nicht gefunden oder kein Zugriff.';return}
+ const path=r.data.filters.storage_path;if(!path||path!==id+'/karte.html'){status.textContent='Ungültiger Speicherpfad.';return}
+ const f=await sb.storage.from('fsd-handykarten').download(path);
+ if(f.error){status.textContent='Kein Zugriff auf die Karte: '+f.error.message;return}
+ const html=await f.data.text();
+ if(currentUrl)URL.revokeObjectURL(currentUrl);
+ currentUrl=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+ const frame=document.getElementById('viewer');frame.src=currentUrl;frame.style.display='block';status.hidden=true;document.title='FSD · '+r.data.name;
+}
+sb.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT')location.reload()});load();
+</script></body></html>
