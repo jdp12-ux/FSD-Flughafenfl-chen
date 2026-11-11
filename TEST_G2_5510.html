@@ -1,0 +1,1157 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>FSD Handykarte</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body,#map{height:100%;margin:0;font-family:Arial,sans-serif}
+#map{height:100%;touch-action:pan-x pan-y;}
+
+#objLegend{
+  position:absolute;left:10px;bottom:12px;z-index:850;
+  background:rgba(255,255,255,.94);border:1px solid #cfd6dc;border-radius:8px;
+  padding:7px 9px;box-shadow:0 1px 6px rgba(0,0,0,.18);
+  font:12px/1.25 Arial,sans-serif;max-width:220px;pointer-events:none
+}
+#objLegend .lgTitle{font-weight:700;margin-bottom:5px}
+#objLegend .lgRow{display:flex;align-items:center;gap:7px;margin:3px 0}
+#objLegend .lgDot{width:13px;height:13px;border-radius:50%;border:2px solid #fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.25);flex:0 0 13px}
+#head{
+  position:fixed;z-index:9999;top:8px;left:8px;right:8px;
+  background:#fffffff2;border-radius:12px;padding:8px 10px;
+  box-shadow:0 2px 12px #0004;display:flex;align-items:center;
+  justify-content:space-between;gap:8px
+}
+#head b{color:#17365d;font-size:16px}
+#head small{display:block;margin-top:2px}
+.headBtns{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end}
+.langSwitch{display:flex;gap:2px}.langSwitch .active{background:#17365d;color:white;border-color:#17365d}
+.headBtn{
+  border:1px solid #bbb;border-radius:8px;background:white;padding:7px 9px;
+  font-weight:bold;cursor:pointer
+}
+.primary{background:#17365d;color:white;border-color:#17365d}
+.numWrap{position:relative;width:34px;height:34px}
+.num{
+  position:absolute;left:2px;top:2px;
+  background:#17365d;color:white;border-radius:50%;width:30px;height:30px;
+  line-height:30px;text-align:center;font-weight:bold;border:2px solid white;
+  box-shadow:0 1px 5px #0008;transition:transform .12s ease,box-shadow .12s ease
+}
+.num.done{
+  background:#16a34a !important;
+  box-shadow:0 1px 5px #0008
+}
+.num.missing{
+  background:#5b4636 !important;
+  box-shadow:0 1px 5px #0008
+}
+.noteFlag{
+  position:absolute;right:-5px;top:-6px;z-index:5;
+  width:16px;height:16px;border-radius:50%;
+  background:#ffd400;color:#1f2937;border:2px solid white;
+  line-height:14px;text-align:center;font-size:11px;font-weight:900;
+  box-shadow:0 1px 4px #0008
+}
+.num.hovered{transform:scale(1.6);box-shadow:0 2px 12px #000c;z-index:9999}
+.numlabel{
+  background:#fff;color:#17365d;border:1px solid #17365d;border-radius:6px;
+  padding:2px 6px;font-weight:bold;box-shadow:0 1px 6px #0003;white-space:nowrap
+}
+.leaflet-top.leaflet-right{top:72px}
+#panel{
+  display:none;position:fixed;z-index:10001;left:8px;right:8px;bottom:8px;
+  max-height:72vh;background:white;border-radius:14px;box-shadow:0 3px 22px #0007;
+  overflow:hidden
+}
+#panel.open{display:flex;flex-direction:column}
+#panelHead{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:10px;
+  background:#17365d;color:white;padding:5px 7px
+}
+#panelHead h2{margin:0;font-size:19px}
+#panelHead small{opacity:.9}
+#closePanel{border:0;background:white;color:#17365d;border-radius:8px;padding:6px 9px;font-weight:bold}
+#panelBody{padding:11px 12px;overflow:auto}
+.row{margin:5px 0}
+.badge{display:inline-block;padding:3px 7px;border-radius:8px;background:#eee;margin:0 5px 5px 0}
+.statusBtns{display:flex;gap:7px;flex-wrap:wrap;margin:10px 0}
+.statusBtn{border:1px solid #bbb;border-radius:9px;background:#f5f5f5;padding:9px 12px;font-weight:bold}
+.statusBtn.active{outline:3px solid #17365d22;border-color:#17365d}
+.statusBtn.done{background:#eaf3df}
+.statusBtn.missing{background:#f7e2e2}
+textarea{width:100%;min-height:76px;box-sizing:border-box;border:1px solid #bbb;border-radius:8px;padding:8px;font:inherit}
+.maps{
+  display:inline-block;background:#17365d;color:white!important;text-decoration:none;
+  padding:9px 11px;border-radius:8px;font-weight:bold;margin:6px 0
+}
+.photoTools{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}
+.photoBtn{border:1px solid #aaa;border-radius:8px;background:#f6f6f6;padding:8px 10px;font-weight:bold}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(105px,1fr));gap:8px}
+.photo{position:relative;border:1px solid #ddd;border-radius:9px;overflow:hidden;background:#fafafa}
+.photo img{display:block;width:100%;height:100px;object-fit:cover}
+.photo button{
+  position:absolute;right:4px;top:4px;border:0;border-radius:50%;width:26px;height:26px;
+  background:#fff;color:#8b0000;font-weight:bold;box-shadow:0 1px 5px #0005
+}
+.saveClose{width:100%;margin-top:10px;border:0;border-radius:9px;background:#6b8e23;color:white;padding:10px;font-weight:bold}
+#mapmsg{
+  display:none;position:fixed;z-index:10000;left:10px;right:10px;bottom:12px;
+  background:#fff3cd;border:1px solid #e3c567;border-radius:10px;padding:5px 7px;
+  box-shadow:0 2px 10px #0003
+}
+
+@media(min-width:900px){
+  #panel{
+    left:auto;right:12px;top:82px;bottom:12px;width:430px;max-height:none;
+    border-radius:14px
+  }
+  #panel.open{display:flex}
+  #panelBody{padding:14px 16px}
+  #map.panel-open{margin-right:450px}
+}
+#planner{
+  display:none;position:fixed;z-index:10000;left:12px;top:82px;
+  background:#fffffff4;border-radius:12px;padding:9px 10px;box-shadow:0 2px 12px #0004;
+  max-width:540px
+}
+#planner.open{display:block}
+#planner .prow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#planner input,#planner select{
+  border:1px solid #aaa;border-radius:7px;padding:7px 8px;min-width:135px;background:white
+}
+#planner .filterrow{display:flex;gap:6px;align-items:end;flex-wrap:wrap;margin-top:7px}
+#planner .fitem{display:flex;flex-direction:column;gap:2px}
+#planner .fitem small{font-weight:bold;color:#444}
+#planner .hint{font-size:12px;color:#555;margin-top:6px}
+
+#planner button{
+  border:1px solid #aaa;border-radius:7px;background:#fff;padding:7px 9px;font-weight:bold
+}
+#planner .assign{background:#17365d;color:white;border-color:#17365d}
+#planner .download{background:#6b8e23;color:white;border-color:#6b8e23}
+.num.selected{outline:4px solid #f5b400;outline-offset:2px;transform:scale(1.15)}
+
+@media(max-width:650px){
+  #head{padding:7px 8px}
+  #head b{font-size:14px}
+  .headBtn{font-size:12px;padding:6px}
+  .leaflet-top.leaflet-right{top:82px}
+  #panel{left:4px;right:4px;bottom:4px;max-height:78vh}
+}
+
+.fsdLogo{display:block;width:112px;max-width:31vw;height:auto;object-fit:contain}
+.brandBox{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0}
+
+/* V11.18 – möglichst viel Platz für die eigentliche Karte */
+.headBtn{padding:4px 6px!important;font-size:11px!important;line-height:1.1!important;min-height:27px!important}
+.langSwitch .headBtn{padding:3px 5px!important;font-size:16px!important;min-width:31px!important}
+#count{font-size:10px!important;margin-top:1px!important}
+#objLegend{
+  padding:5px 7px!important;
+  font-size:10px!important;
+  line-height:1.12!important;
+  max-width:128px!important;
+  border-radius:7px!important
+}
+#objLegend .lgTitle{font-size:10px!important;margin-bottom:2px!important}
+#objLegend .lgRow{gap:4px!important;margin:1px 0!important}
+#objLegend .lgDot{width:9px!important;height:9px!important;min-width:9px!important}
+.leaflet-control-layers{
+  font-size:10px!important;
+  border-radius:6px!important
+}
+.leaflet-control-layers-expanded{
+  padding:4px 6px!important;
+  min-width:82px!important
+}
+.leaflet-control-layers label{margin:1px 0!important;line-height:1.15!important}
+@media (max-width:600px){
+  .fsdLogo{width:98px;max-width:29vw}
+  .headBtn{font-size:10px!important;padding:3px 5px!important;min-height:25px!important}
+  #objLegend{font-size:9px!important;max-width:116px!important;padding:4px 6px!important}
+  #objLegend .lgTitle{font-size:9px!important}
+}
+
+#objLegend .lgDot{
+  width:10px!important;height:10px!important;
+  min-width:10px!important;max-width:10px!important;
+  min-height:10px!important;max-height:10px!important;
+  flex:0 0 10px!important;
+  aspect-ratio:1/1!important;
+  border-radius:50%!important;
+  box-sizing:border-box!important
+}
+
+/* V12.6 – kompakter Kartenkopf */
+#head{right:auto!important;max-width:min(720px,calc(100vw - 16px))!important;padding:5px 7px!important;gap:5px!important}
+.fsdLogo{width:88px!important;max-width:24vw!important}
+.headBtns{gap:2px!important}
+.headBtn{padding:3px 5px!important;min-height:24px!important;font-size:10px!important}
+.leaflet-top.leaflet-right{top:8px!important;right:8px!important}
+.leaflet-control-zoom{margin-top:0!important}
+@media(max-width:650px){#head{max-width:calc(100vw - 72px)!important}.fsdLogo{width:76px!important}.leaflet-top.leaflet-right{top:8px!important}}
+ .leaflet-interactive{pointer-events:stroke;} </style>
+</head>
+<body>
+<div id="head">
+  <div class="brandBox"><img class="fsdLogo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAD3AgcDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD9U6KKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooqG8u4bCznvrltsNtG00jeiqCSfyFDdgJqK88+Afj6b4lfC/S/FV5IHuppLiK49mSZwB/3zt/OvQ6zo1Y16casNmr/eTCaqRUo7MKKKK0KCiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACvOP2ivEv/CJ/BTxbqwlMcjae1rEwPO+YiJcfi9ej18xft7+JP7P+GekeG42w+r6mJHGescKE9PTc6H8K4M0r/V8HUqeT+96I58XU9nQlLyKX7APib7f4J8R+F5Jdz6ZqEd0i+iTIRx/wKJvzr6qr8/v2EfEn9k/Fq80KRsR63pkkYBOAZI2Ein67Q4/Gv0Bri4cr+2y+C6xuv6+Rhlk+fDx8tAooor3DvCiiigAooooAKKKKACiiigAoor5F+IX/AAUW8F/D39rC1/ZPvPhzrV3q11rmi6GurRXUS26vqKWzpJsPzYT7UuR1O04oA+uqKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACvgz9vrxN/aHxI0bwzG2U0jSxK/PSSZySD/wFEP41951+X37SmqX/iX4xeKfET285sjqDWVvO0ZCMIVEQAPQ8JXzXFVbkwSpr7TX3LX/ACPLzafLQ5e7PpD9mHxx+zrqeleG7W603R9H8d6TAtubi4t1t3uJApQOkoO1yy9QTuyTxX1jX43wyvDMk0bbWRgwPoRX65eA/EC+LPBOheJUkD/2np1vdMw7s0YLfrmo4azH61TlQlFJxttpfpr5iyvE+1i6bSVvxN6iiivqD1QooooAKKKKACiiigAooooAK/Fb9pb/AJTJaR/2UDwJ/wCiNLr9qa/Fb9pb/lMlpH/ZQPAn/ojS6AP2pooooAKKKKACisDx9448P/DTwPr3xC8V3EkGj+HNPn1O+kjTe4hhQu21R95iBgDuSBX5ia1/wXGvP7SnXw5+zrCdPVysD3viQiaRM8MypblUJGMqGbH949aAP1aor8lv+H43ij/o3XS//Ckk/wDkej/h+N4o/wCjddL/APCkk/8AkegD9aaK/Jb/AIfjeKP+jddL/wDCkk/+R6P+H43ij/o3XS//AApJP/kegD9aaK/Jb/h+N4o/6N10v/wpJP8A5Ho/4fjeKP8Ao3XS/wDwpJP/AJHoA/WmivyW/wCH43ij/o3XS/8AwpJP/kej/h+N4o/6N10v/wAKST/5HoA/WmiviD9jP/gp34Z/am+Ig+E/iH4cy+D/ABFdWs1zpjx6l9ttr7yl3yR5McbRuEDuAQykI3zA4B+36ACivjX9tj/gpD4X/ZI8V6f8OtL8Az+MPFF3ZrqF1E1/9itrKByyxlpPLkMjsUY7AoAXBLc4r5g/4fjeKP8Ao3XS/wDwpJP/AJHoA/WmivyW/wCH43ij/o3XS/8AwpJP/kej/h+N4o/6N10v/wAKST/5HoA/WmivyW/4fjeKP+jddL/8KST/AOR6dH/wXG8SBh5v7OWmsvoviaQH8/sxoA/Weivy30X/AILj6PLIF8Rfs43lsn/PSy8TrOf++Xtk/wDQq9f8Df8ABYz9k/xNNDa+KLXxj4QdyBJNqGlrc26e+61kkkI/7Zj6UAfdNFcL8L/jp8HfjVYtqHwq+JGgeJo413Sx2N4rTwjj/WQnEkfUfeUda7qgAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKK5PwD48tfHEniSK22Z8P65caO+0/e8tUYN/4/j8DUSqRjJRe72Jckml3OsoooqyhkxkWGRomQOFO0v8AdBxxn2r8zf2hvEGnah4ifT5vHV7401qBz9u1PiHT4G5zBaQrkbQer5wccDqT9q/tY+KpvCvwN1+e1neG41ARafEyNtb944DYP+4G/DNfmb94/WvieK8baUcKl0u/+G26b/ceHm9bVUl6l7Q7zTbHUobnWNJGp2an97bec0Jcezryp9Dgj2Nfpj+zT4n8HeJfhNpg8D/2iun6Y72Jh1B1eeBxhzGWUAMAJBggDjHevmnTP2B/EmraPY6ta/EPTVF7bRXAjkspBt3qGxkMc4zX0D+zT8EfE3wP0nWtF1vXrDU7fUbiO5g+zBx5bBSrZDAdRt6elHD2Cx2CxH72naElvp6+osuoV6FX3o6Proe0UUUV9se6FFcn8UPHVt8N/Bd54uulVktZbePYf4vMmRCB74Yn8K6tWVlDKwKkZBHQioVSLm6fVWf33/yJ5k5cvUWiiirKCiiigAooooAK/Fb9pb/lMlpH/ZQPAn/ojS6/amvxW/aW/wCUyWkf9lA8Cf8AojS6AP2pooooAKKKKAPAv29mZf2OfiyVJH/FOzD/AMeWv51K/or/AG+P+TOPiz/2Ls3/AKEtfzqUAFFFFABRRRQAUUUUAFFFFAH1H/wTFZl/bm+GJUkfvdVH/lKu6/oFr8Av+CXOm3uoftxfDqS0t3kSyGq3NwyqSIoxpl0u5sdAWdF+rAd6/f2gD8JP+CuDMf2z9bBJONF0oD2/cCvjKvsz/grh/wAnoa5/2BdK/wDRAr4zoAKKKKACiiigAooooAu6LreteHNUttc8Pate6XqNm4lt7yyuHgnhcdGSRCGU+4NfoX+yh/wV4+IHgm8s/B/7Sccvi7w87JCviCGNV1SxUnG+VVAW6QDrwJOp3OcLX5z0UAf1IeEfF3hjx94Z07xl4L1yz1nRNXgW5sr60kDxTRnuCO4IIIPIIIIBBFbFfhD/AME5/wBt/WP2aviDa+AfGurPJ8MvE12sV9HPISmj3DkKL6P+6o4EqjqnzcsgB/dyOSOaNZoZFdHUMrKchgeQQR1FADqKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAqatqVvo+l3mrXjbYLG3kuZW9ERSxP5A18jfsJ+OLjWPE3jrTL5h52qyLrO3P8Ay0MjCTH18xfyr3D9p/xJ/wAIz8DfFN4shSS7tRYRkdczMIz/AOOs1fMP7Hnx41TRPE+i/CXU9N0+bStQmmitrwx7bm2kcM4XcPvKzgDBGct14xXzmY4uFPNMPTlK1r/Ny0S/4J5mJrRji6cW7W/XQ+8qKKK+jPTPkb/goN4l8nQPCvhGOT5ru6n1CVQegjUImfYmR/8AvmviWvoX9uHxJ/bXxofSY5Q8eiafBa7R/C7Ayt/6MFeP6f8ADXx7qmg3niix8J6i+kafCZ7i+aEpCiDvvbAb6DJr8uzucsVmFTkV7afctT5THSdbES5dbfodX4D/AGlvjJ8PVittH8XT3VjCAq2WoD7TDtH8I3fMo/3SK+pvgb+2ZH8SvFWm+BvFHhVNP1HUmaOG7tZswM4Qtgo3zLnaQME8kV8E10Xw58Qt4T8eeH/EiyBP7O1G3uGY9lVwW/TNTl+cYrCVIrnbhdXT10+e3yFh8bWoyS5tD9caKbHIssayRnKuAyn1Bp1fqZ9YfMf7e3ib+zPhto3h2OQCTV9U8xl7mOFCT/486V7X8HfEQ8WfCzwt4g3BnutLg8wg5/eKoV//AB5TXyR+2947vLH4xeGYNJmC3HhW1ivoty7lS4eXzMkHg8RxcV9E/sx/GCf4w+AZtU1DS7HT9Q027NpcQ2SlYmyquJApzt3Fm4yeQT3r5zCYuFTOK0ObWySXpvr5anmUa0ZY2cb+X3f0z1+iiivoz0wooooAKKKKACvxW/aW/wCUyWkf9lA8Cf8AojS6/amvxW/aW/5TJaR/2UDwJ/6I0ugD9qaKKKACiiigDwL9vj/kzj4s/wDYuzf+hLX86lf0V/t8f8mcfFn/ALF2b/0Ja/nUoAKKKKAP1R/4Jq/sT/sx/tAfs5zePPi58M/7e11fEV7Yi6/tnULXEEccJRdlvOicF252555NfVv/AA64/YT/AOiG/wDlzax/8l14F/wSq/aD+Bfwx/Zfm8N/EX4weD/DOrN4mv7oWWq6zb20xiaOAK+x2B2kq2D7Gvsb/hsb9k//AKOR+G3/AIU1p/8AHKAPNv8Ah1x+wn/0Q3/y5tY/+S6P+HXH7Cf/AEQ3/wAubWP/AJLr0n/hsb9k/wD6OR+G3/hTWn/xyj/hsb9k/wD6OR+G3/hTWn/xygDzb/h1x+wn/wBEN/8ALm1j/wCS6P8Ah1x+wn/0Q3/y5tY/+S69Lj/bC/ZRkkWNf2kvhoCxwN3iizUfiTJgV6lout6N4k0q113w7q1lqmm30YmtbyyuEngnjPRkkQlWU+oOKAPOPgr+y38Af2d5L24+Dnw007w9c6jGIbq7WWa5uZIwciPzp3eQJkAlQ2CQCRkCvVKKKAPwj/4K4f8AJ6Guf9gXSv8A0QK+M6+zP+CuH/J6Guf9gXSv/RAr4zoAK9r/AGKtB0PxR+1b8MPD/iXRbHVtLv8AxBBDdWN9bpPb3EZDZSSNwVdT6EEV4pXvP7Bv/J4nwl/7GS3/AJNQB+7bfso/styNuf8AZr+FbE9z4O04/wDtGmt+yb+yuylT+zT8K8EY48HacD+Yh4r1aigD5H+MX/BLn9kn4qabcrovgf8A4QTWZBmHUvDkjQrG3YNasTAy56gIrY6MvWvx8/as/ZL+Jf7JXjqPwp44WG+0zUlebRdbtVIt9RhUgNwcmORcrvjJyu4EFlKsf6O6+e/28fgRpfx//Zm8X+G5bOOTWtGspNd0Kfyw0kV7bIZAqHGR5qB4TjtIfQUAfzt0UUUAFfvP/wAEtfjtdfGf9l3TdJ1y9NxrvgG4Phy6Z2JeS2RFa0kOf+mTCPPcwsa/Biv0c/4ImeOJtN+NPjz4eNIVtte8Nx6oFJ4M1ncoigD12Xkh+i0AfsZRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFAHzz+2h8RNJ8I+ALTQLhbuW/wBamc28MMojQrGuGaVsbtoMi4VSpYjBOMg/FXwuvNW8I+LtG8ZN4RuNRtLO7juFZoZgo2ODvR0xyCPcccg165+3h4k/tT4sWWgxuGTRtMjVgD0kkYuf/HSlc58Jf2uPiL8K9HtPDCWmn6votnuENtcR7HjUsWIWRMHqSfmDda/O80xVOvmkvbT5Yw0TSvqu/wA7nzeLqxqYp88rJbaXP0egmS4hjuI87JVDrn0IyKkrlfhd4+tfid4D0jxxZ2ZtE1SJma3Mm8xOrsjLuwM4KnnA4xVvx94sg8C+C9a8YXEImTSLKW68rdt8xlX5Uz2ycD8a+/VaDpe2v7tr38tz6FTi4c/Tcw4vgp8LbfxRqHjq+8K2d9rN9Obqa81D9/sbAxsD5VAABjAGMda8f/aZ/aO+Ftr4F174b6Hqi6vquo2rWeNPw0FsSRnfJ904x0XJ9cV8u/FT9pb4ofFZ5bXU9YOnaQx+XTbAmKIj/bOd0n/AiR6AV5TXw2P4ipuMqOBppKV7tre++n6s8HEZlHlcKEbJ9TovBvgLxJ4+vH0vwrb295qCjctm11HFLKO+wSMu8j0XJ9qv658Hfir4aJbW/h54gtUTrI2nyGP/AL7AKn865GCea1mS4t5niljYMjo2GUjoQR0NfUfwR/bZ1/wz9n8O/FRZ9a0xcRpqSc3cA7b/APnqB7/N7t0rw8FTwdd+zxEnB99181uvv+44KEaM/dqNp9+h9c/BfxBN4o+FPhXWroOLibS4I7jeMHzo18uTOf8AaVq7Ssbwn4u8M+NtGh8QeE9YtdSsJ/uywNnDd1YdVYdwQCKl8Ua1F4b8N6r4gmKhNNs5ro7uh2IWx+lfqlJqFGLcrpLfvpufWwaUFrfTc/PH9qjx3Y/EL4rahpfhu2v7r+zrp7IvI24ySx/u2WGNAAEBU4J3M3XOMAewfsI63eabe694I1LwzLp80tul8ty8cqGYIwQqwY7cjzBggDvnOK+R9J8Wa54f8VQeMtJvPJ1W1u/tkUzKr4l3ZyQwIPPqK+vfgZ+2l4k8YeLtH8D+OPD9hI+qzi1TULVjCUdvulozkHJwOCvWvz/KsXRqZh9ZrT5ZN6K1076Wv0+4+dwlaEsR7WpKzb7dz69ooor9GPpQooooAKKKKACvxW/aW/5TJaR/2UDwJ/6I0uv2pr8Vv2lv+UyWkf8AZQPAn/ojS6AP2pooooAKKKKAPAv2+P8Akzj4s/8AYuzf+hLX86lf0V/t8f8AJnHxZ/7F2b/0Ja/nUoAKKKKACiiigAooooAK/Yz/AIIm+I9Y1D4L+PPDd5fTTWGkeIoZrOKSQssHnwAyKgP3VLRhsDjLMepNfjnX68/8EQf+SbfE/wD7Dlj/AOk70AfpfRRRQB+Ef/BXD/k9DXP+wLpX/ogV8Z19mf8ABXD/AJPQ1z/sC6V/6IFfGdABXvP7Bv8AyeJ8Jf8AsZLf+TV4NXvP7Bv/ACeJ8Jf+xkt/5NQB/RfRRRQAU11WRWjkUMrDaysMgj0NOrm/iV420/4b/D3xN8QdWeNbTw3pN3qk3mNgFYYmk259TtwPUkUAfzG+JtPh0nxJq2l27K0VnfT28bL0KpIygj8BWbUlxcS3VxLdTNukmcyO3qxOSajoAK+z/wDgkXdSW/7ZujxR7ttzoeqRPj0EO/n8VFfGFfdX/BG/w9Nq/wC1pd6sqnytD8J392zY4y8tvAF+p80n/gJoA/b6iiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKw/HOvp4V8F674lkbaNL064us+6Rlh+oFTOShFylshN8quzwD4q/Bn4D6H4y1f4q/HDxlNcSapP50Gmeb5QKKoVEVI8yyYVVGQQPWvje28G3/wARPFur2/w30kTwvdzS2Nh50cc5gLsUVEZssQuMhcmuf13XtZ8S6pPrGvapc6heXDbpJ7iVpHb8Sc49B2qnb3FxazJc2s0kMsTB0kjYqysOQQRyCK/K8dj6OMqXjS5Y3bdvid+71Pkq+IhWlpGy/F/M/RT9jfTPF3hv4a3vhLxh4fv9JudL1OQwpdwtGXjkVWyueo3bunrTP23PEv8AYfwRudLjlCy65fW9njuUVvNbH/fsD/gVcT+x3+0R4w8da3N8N/HF8moNBYvc2N9J/wAfD7GUGNz0f5WJDH5vlOSc8d5+078D/G3xwfw9pXh/U9MsdN00zzXMl077jK20LtVVOcAN3719lTqfWMmcMHeTtyrv2/BHtRl7TA8tG70t5n5yUV9X6t+xr4D+Hulf238VvjRBptsv8FvZgPJ7R7mLOfYIa+cPHSeBovEc8Pw6l1aXRI1VYZdU2efIwHzMQgAAJ6DGcda+GxWX18Ev39k30um/uR4VXD1KH8TR9r6nP0UUVwmB9Y/8E/fEzWvi3xN4Tlmwmo2MV5GpP8cLlTj6rL/47X198RvCLePfBOreDl1RtOXVofs8lwse8pGWG/AJGSVyOvevzr/ZT8S/8Iz8dvDMzSBIr+dtOkz385Sij/vsrX0X+3p481bQtA8P+EdH1a5szqsk894sEhTzYUCqEYjqpLHjocV9zlGPp0cnnKqrqDat3v8A8Oe9g8RGGCk56paff/w55N8d/Bv7N/w08Gy+E/A+rS654ye5i828a4M3kopO9SUxEufQAt61514J+F/xTt7jSfiB4Y8J3er2VjdRXaT6ay3ADRsG2sIySrccggGvN66n4f8AxM8a/DDWV1vwbrk1jNwJY87op1H8MiHhh9enbFfLyxVCviFUqQ5Irbl6eeu7+48l1adSpzSjZeX9an6zW832i3iuArKJUV8MMEZGeQelSVxHwX+Ib/FP4a6P41ngggub2N1uYoSdiSo5RgueccZwScZrt6/VqVSNanGpDZq/3n10JKcVKOzCiiitCgooooAK/Fb9pb/lMlpH/ZQPAn/ojS6/amvxW/aW/wCUyWkf9lA8Cf8AojS6AP2pooooAKKKKAPAv2+P+TOPiz/2Ls3/AKEtfzqV/RX+3x/yZx8Wf+xdm/8AQlr+dSgAooooA+o/2b/+Cdfxz/ai+HbfEz4d674NtNKXUJtNMerX9zDP5sSozHbHbyLtxIuDu9eK9T/4cv8A7V3/AENnwz/8G97/APIdfaH/AAR2Xb+yCT/e8Vakf/HIB/SvuKgD8Tf+HL/7V3/Q2fDP/wAG97/8h0f8OX/2rv8AobPhn/4N73/5Dr9sqKAPxPj/AOCLv7VjyKsnjD4ZRqTyx1a+OPys6/SH9hf9kdf2QfhPc+ENQ8RRa54g1y+/tPV7u3jKW6yeWqJDCG+Yoir95gCxZjhRhR9H0UAFFFFAH4R/8FcP+T0Nc/7Aulf+iBXxnX2Z/wAFcP8Ak9DXP+wLpX/ogV8Z0AFe8/sG/wDJ4nwl/wCxkt/5NXg1dZ8JviZr3wb+JHh74o+F7WxuNW8NXqX9pFfRu9u8i5wJFRlYrz2YfWgD+nyivxR/4fS/tVf9CX8L/wDwU3//AMm1Bdf8Fnv2sLiIxw+Gfhrasf8AlpFpF4WH/fd2w/SgD9ta/J//AIKrft0+HfE+iz/sy/B7xBFqMD3IbxdqlnJuhPlNlbCNxw/7wK8jKcAxqmTmQD4/+MP/AAUB/aw+N2m3Og+LvindWei3Y2zaZosEenwSL3R2iAkkU91d2B9K+d6ACiiigAr9df8Agib8J7jSvAvjz4zahblf7fvoNC01mGCYbZTJOy+qs80a/WE1+Wnwt+Gfi74xfEHQ/hn4F01r3W9fu0tLaMZ2pnlpHI+7GihnZuyqT2r+kT4G/CPw/wDAj4S+F/hL4Y+ex8N2CWvnFArXMxJeadgOA0krO5HqxoA7qiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAK4j4zR+C7v4c6tpfj7xMNB0W+RYbi6Eyo5G8NsTcDuLbcYAJIJwK7evjv/goN4k22/hPwjG3LtPqEqg9ANqJn65k/KvOzXErCYOdWSvpa3e+hzYuqqNGUmr/8E8F+JPiD4D2dtcaD8KfBN/dM/wAp1vVryTeMEcxQqQoz6v6/dHWvK1VpGEcalmY4CgZJNJUtrcz2dzFeWshSaBxJG2M7WByDz71+V1qzrz5mkvJKyPk5z53fb0PXv2bf+Ej8F/G7wtqV9ouo2sE159imaS1dRtmUx85HHLD8q97/AGhv2yNY8G+ItT+H/wAP9JiivtOkNvc6pdYfbJgZEUfTjONzZ5B+XvXDeBv29fHWk+XbeOvDtlrsK4DT2/8Aos59zgFCf+AivnDxbr83irxRq3iScMH1S9muyrHJXe5bH4ZxXuf2jHAYP2OBqtuTu9LNafPfyO76ysPR5MPPd9rWDxN4s8S+MtUk1rxVrl5ql7KfmmuZS5HsM8KPQDAFZNFFfPylKb5pO7PPbb1YV7H8JP2X/HHxj8Ky+LPDeq6RBbQ3klk0d1LIr70RGJ+VCMYkHfsa8crv/hr8dPid8J1Nv4N8RPBYvKZpbGaNZbeRyACSrDgkKBlSDwOa6cFLDRq/7Wm4eW5pRdNT/fJ28j1vSf2Jvjd4f1qw1rT73w+8+n3UV1GVvXGGRwwPKeor1b9qI/s9t4gt9a+Keu6pf6zZWK20Ph/S7ldycs+XIH7vO7qzDIAwDXP+Bf2/7SRorT4i+DXizhWvNKfcB7mJz0+j/hXyx8UPFi+OviH4h8XRbjFqeoTTw7hyIyx2DHb5QvFfQYjFZdg8K44H3+dq6l0t1tp/kejUq4ajRtQ15uj6WK3jTXPDmvasLjwr4Rh8PadFH5cdst1JcO2CTvkkc/MxyBwFHA4rKsNJ1TVWddL026vDENziCFpNo9TtBxVSu3+Ffxg8bfB3V7jV/Bt1bo15GIrmG4gWSOZAcgHPIwe6kV83Bwq1b1nZPeyX5aI8yLjKXv6Ly/yPsT9hHVNS/wCFd614X1S1uIJdJ1ITRrNGyYimQYxn/ajf86+mK+dP2ef2s2+MHiNfBeveF49O1NreS4juLefdDLswSuxhuU4yep6Gvouv1HJ50pYOEaM+ZR0va34eR9XgpQdGKhK6QUUUV6Z1BRRRQAV+K37S3/KZLSP+ygeBP/RGl1+1Nfit+0t/ymS0j/soHgT/ANEaXQB+1NFFFABRRRQB4F+3x/yZx8Wf+xdm/wDQlr+dSv6UP2r/AADrnxR/Zt+I/gHwxb/aNX1jw9dw2MGcGedU3pGD6syhRnu3av5vda0HXPDepT6N4i0a+0rULWRop7W9t3gmidThlZHAZSCCCCO1AFGiipLe2uLyZLa0t5J5pDhY40LMx9gOTQB+4v8AwR7/AOTPo/8AsZ9S/lFX2/Xyj/wTF+FfjL4S/sl6Fo/jrRbrSNV1bULzWDYXUZjnghmYCISIeUYoivtPI3AHByB9XUAFFFFABRRRQAUUUUAfhH/wVw/5PQ1z/sC6V/6IFfGdff8A/wAFhvhL450v9oyP4p/8I7fz+GNf0Wzhj1OKBnt4rmBWR4HcDCPtVXAbqGyM4OPgCgAooooAKKKdHHJKwSKNnY9lGTQA2iug0X4efEDxJIIvDvgbxBqjk422WmTTn8kU16/4G/YF/bC+IM0Mei/APxPZxzYxNrMC6XGq/wB4m6MeRjngEntmgDwCui+H/wAO/HHxW8V2Xgf4d+GL/X9c1FttvZ2ce5j6sx+6iDqzsQqjkkCv0a+Cv/BFPxRfT2+qfH74m2emWgYNJpPhtTcXDrnlWuZVCRnr92OQc9a/SP4I/s6fBr9nbw+fDvwj8D2OiRSgfaroZlvLxgB8007kyPyMhSdoydoA4oA8N/YI/YL8P/sn+G28UeKWtdX+JWtW/l6hfx/NDp8JIY2lsSAcZALyYBcgdFAFfXdFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFUNQ0HQ9VlWfVNFsLyRF2q9xbpIwXrgFgcCr9NkkjhjaWaRURRlmY4AHuTSaT3E1fcx5PBvhHy3/wCKV0f7p/5cYv8A4mvkH9hDR9I1XWvGq6ppVneLFHbbBcQLJt+eTpuBxX0r4u+P/wAG/Byyxa58QNKWdAQYLaQ3MoPoViDEfjiviH9nL9oDQ/gheeJL3UtDvNTfV1iW3SB1QLsZydxbkfeHQGvmczxWEpY7DylJWjzX620Vr2PLxVWjDEU22rK9/uPuzx18OdJ1zwbrWi+HdB0K01LULGa1tp5LJAsTupXdlVyMZJ474r5F/wCGAPiP/wBDf4e/Ob/4itLWP+ChHiaUsvh/4d6XbD+Fry7kn/RAn8643UP25fjheMTay6HYqe0Fhux/38Zq4swzDJcZJSqXlbsmv8jDEYjA1neV3bsdB/w7/wDiP/0OHh785v8A4iuG+MX7LPi74M+FIvFmua/pV5by3kdkI7Uyb9zK7A/MoGMIfzFQ3n7Xnx9uyT/wmxhz/wA8bOBf/ZK5Lxp8bPil8QtKXQ/GXjC61OxSZbhYJI41USKGAb5VB4DN+deLiauTunJUKclLo29PzOGrPBuL9nF3/rzNf4I/ATxF8cptYh8P6vp9idGWBpfte/5/NLgbdqnp5Z6+or1X/h3/APEf/ocPD35zf/EV4J4F+KHjz4ayXkngfxJcaS2oCMXPlKjeYE3bc7lPTc3513dp+138fbUg/wDCcNNj/nrZwN/7JUYOrlUaSWKhJz6tbfn2FRlhFBKrF38v+HPQP+Hf/wAR/wDocPD35zf/ABFfQv7PfwFuPhb4RvPDfja30DWZHvmureeO28wqjIoKkyKD1XI+pr5Xsf24vjlaMGuLrRr0D+GbT1Gf++CtddpP/BQbxpDj+3fAOi3g7/ZZ5bcn/voyV7OBxmR4Wp7WmpRfnd/5nbQrYClLmjdPzPRf24fD+g6X8I7S403Q7C0lOrwqZILZI2x5cnGVAOK9M+BPhXwvdfBrwXcXXhvS5pZNFtWeSSzjZmJjGSSRkmvlD4/ftU6H8avh7b+F7fwre6XfRX0d0zNOssRVVcEAgA5+b0r6C+AP7QHweT4a+FvCt5460+x1TTdMt7S4gvd1uFkVQCA7gI3PoTXdhMbg62ZzqRkuVxSV9Nb+Z0Ua9GeKlJNWsj26z8N+HdPuFutP0DTradchZIbWNGGeuCBmtKq9jqGn6pbrdabfW93A33ZIJFdT+KnFWK+oiope7seqklsFFFFUMKKKKACvxW/aW/5TJaR/2UDwJ/6I0uv2pr8Vv2lv+UyWkf8AZQPAn/ojS6AP2pooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAqtqN42n2U14llcXbRLuENuoMknsoJAz9TVmikwPnr4gfE79p++aSz+G/wQm02Dot5qN1byzn3EaybE/EvXzz4w+F/7ZXj6VpPFml6/fo3/ACwbUIFgX6RLIEH4Cv0LorxcVkv1z+NWm12ukvuSOGrgfb/HOX4f5H5i/wDDKf7QR6/Dm8P/AG9W/wD8co/4ZT/aA/6Jxef+BNv/APHK/TqiuD/VLB/zy/D/ACOf+x6P8z/D/I/MX/hlP9oD/onF5/4E2/8A8co/4ZT/AGgP+icXn/gTb/8Axyv06oo/1Swn88vw/wAg/sej/M/w/wAj8xf+GU/2gP8AonF5/wCBNv8A/HKP+GU/2gP+icXn/gTb/wDxyv06oo/1Swn88vw/yD+x6P8AM/w/yPzF/wCGU/2gP+icXn/gTb//AByj/hlP9oD/AKJxef8AgTb/APxyv06oo/1Swn88vw/yD+x6P8z/AA/yPzF/4ZT/AGgP+icXn/gTb/8Axyj/AIZT/aA/6Jxef+BNv/8AHK/Tqij/AFSwn88vw/yD+x6P8z/D/I/MX/hlP9oD/onF5/4E2/8A8co/4ZT/AGgf+icXn/gVb/8Axyv06oo/1Swn88vw/wAg/sej/M/w/wAj83vDvwG/au8I3S3nhfw7r2lTKc7rTU4os/XbLyPY17x4D8dftoeHWit/F3wtHia0XAZpLi3t7jHs6Ptz9VNfVNFdeGyGODd6Naa+at91rG1LL1R/hzkvu/yMTwn4h1DxFp32rVPCmqaBcqdr2t/5RbP+y0bsrD34+lbdFFe7FOMbN3O9Ky1CiiiqGFeL+JP2N/2bvF/xih+P3iL4brd+PYNQsdUj1f8AtW+QrdWaxLbSeSkwhOwQRDGzB2/MDk59oooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAK858dftHfAX4Ya//AMIr8RfjB4T8N6x5KXH2LU9Uit5vLfO19rkHBwcH2r0avEPi9+xT+zH8ePGB8ffFj4YJr2vNaxWZu21a/t/3Medi7IJ0TjcedueeTQB+O/7LPxlh0L9urw/4o8X/ABMks/CMXibU5pr2/wBVZbFYHS42MzO2wKSyYJ45Ffsd/wANqfsk/wDRx3w+/wDB9b//ABVfiX+zJ8KvAPj/APbc0L4S+LvD66h4TvPEmpWM2nG4mjDwRR3BjTzEdZBgxpyGyccnrX68/wDDsP8AYZ/6IVD/AOFBq3/yVQB+V37Yfxmt/EX7b3iLxP4H+Jr3/hSXWtLkgvNO1VmsmiSG3EjKyNsKhlfOOMg1+xh/bS/ZJH/Nx3w9/wDB9b//ABVfib+1v8KfAHw0/bS8QfCnwT4fXTfCtlrGmWsGni5mlCRSw27SL5kjtIcmRzktkZ4xxX67/wDDsP8AYZ/6IVD/AOFBq3/yVQB+fn/BWH49+FfiB8WPBeofBj4tWmtadbeHXhu5dA1fzIkmNzIdrmJsBtu04POMV94fsw/te/s2aD+zp8NdH8YftBeC7TW7Pwxp8OoW99rkIuIp1hUOsoZtwcMDkHmvzl/4Km/s9/B/9nf4qeDvDvwb8HL4d07VPD7Xt3Ct9c3PmTC5kTdunkdh8qgYBA46V9xfs0/8E8f2OfH37Pfw68beLfg3Ff61rnhqwv8AULo65qUfnTyQqzvtS4VVySThQB6CgDyX/gq/+0t8LfiB8H/B2n/Bf41aJrOpW/iUzXUWgayrzJB9llG5xE2Qu4qMnjJFdh/wTR/an+CfgH9luDSPi58cPD2k67HrmoTPa6xrCi78pihRtjsXIPOOOecV5B/wVM/ZF/Z3/Z3+EvhHxJ8HPh1H4e1LU/EX2G6nXU7258yD7NK+zbPM6j5lU5AB46113/BN/wDYm/Zh+PP7M9v47+LHwvTXddk1q+tGvDq9/bExRlNi7YJ0UYyecZoAg/4KwftKfC/4hfCzwPafBb40aNrN/ba/LNdx6DrCvNHCbZgGkEbbgu4gc9677/gmj+1J8FPA/wCy7Y6H8Wfjl4b0nX11rUJHtta1qNLoRM6lGIkbdtPOO3WvEv8Agqd+yT+z1+zr8MfBevfBv4dp4dv9U12Szu5l1O9ujLCLdnC4uJnA+YA5AB967r/gnD+xN+zD8df2Z7Lx98VvhfHruvS6xf2r3jatf25MUbqEXZDOicAnnbn1oA9p/bk/ay/Z78Vfso/ETw/8Pfj14R1HxDe2EMdja6XrcTXUr/aoSRGEbcTtDE47A18s/wDBJP8AaF8D/D3VPiXJ8a/jBp+ix3tvpn9nnxBrAjErK0/meX5rckbkzj1Fe4/trfsD/sk/Cf8AZb8f/EL4f/COLSfEGi2MM1jeDWdRmMLtcxITsluGRvlZh8ynrXzD/wAEp/2Z/gh+0ZqnxGt/jN4HTxHHodvpr6erahdW3kmVpxIf9HlTdnYv3s4xxQB+nWt/tn/snzaLqENt+0Z4AaZ7WYRhdet8lthwB83WvyK/4Jz/ABps/Bv7Wmg+IPil8TjpfhyKz1NJrrWdVZLVWe2kCBjI20EsRjPfFfp1rf8AwTL/AGHrTRb+6t/gbCksNrLJG39v6qcMEJB5ucda/J//AIJ7/CP4d/Gz9qrQ/h18TvDq634du7PUpZrJrmaAO0Vs7xnfC6OMMoPDc45oA/aj/htT9kn/AKOO+H3/AIPrf/4qvxu+Ovxki1T9vTV/Ffh34mSXPhCTx1ZXUd7aaqzWLWqzQlnDK2wxgBsnpgGv1W/4dh/sM/8ARCof/Cg1b/5Kr8g/jd8K/AXhP9ubVfhD4f0BbTwjb+NrPSYtNFxM4W0eWFWj8xnMhyHbktu560Afu34D/aL+A/xR15vC/wAOfi94T8S6usL3JstL1SK4l8pCAz7UJO0FlyfcV6LXiXwf/Yt/Zm+Afi5vHfwl+GMeg641pJYm6XVr64/cOVLrsnmdOSi84zx1r22gAooooA/C/wCAHxl/4KWftN6tq2ifCH4za7qd3olvHdXi3GpWlqEjdiqkGUANyDwK+sP2efhh/wAFU9H+NXhHVPjV41vbvwPb6gH1uF9dsZg9vtbgpGdzfNt4FeR/8EQf+Sm/E3/sA2X/AKUNX6+UAFFeH/GT9tf9mH4A+IB4T+KXxWstM1vCNJp9vaXN9PAr4IaVbaN/K+UhsPgleQDkZ774U/GL4Y/HDwrH42+FHjLT/EmjPIYWuLVmDRSgAmOWNwJInwVO11VsMDjBFAHZUV43pv7Yn7MurWfivULX4w6Itt4IZY9emuPNt0snZ3RUJkRQ7M8bqFTcSV4B4re8O/tD/BnxR8HY/j9pvjqyi8ASpPIut30clnFthuHt3JWdUdf3sbKAVBY4wDkUAejUV8//AAt/b1/ZL+MvjCHwF4A+L9ld67duY7O1u7C7sftbcfLE9xEiux7IDuODgV8c/wDBZn4zeFZNL8JfC7wx41ki8XaFqzXuq6dbNNFJBbzWoMTMwAVg24EAMetAH6jUV5h8Cfjp8J/jL8Px4k+G/jaz1vTdDjjstSulSSJLadIEd1cyqvRWBJ6c9a86h/4KO/sV3Hi4eCo/jtpX24zfZ1uGs7tbAyZPH2wxeRt4+/v2cjDUAfSlFUNW17Q9B0W68Sa3rFlYaTZW7XdzfXM6x28MCruaR5GIVVA5LE4xXz94Z/4KK/sZ+LvF8XgjRfjhpp1K4mFvA91Y3lrayyE42rczRLD1wAS4ByME0AfSFFct8TPih4D+DvhC68e/ErxFDoWgWTxR3F9NHI6RtI4RARGrNyzAcDvXA6t+2R+zRosfg5rz4saY03j97dfDtrBDNLcXwnk8uJ/JRC8UbPlRJIEXIPNAHs9FedeFf2hvg142+J2t/Brwv46tb3xp4cSaTU9IEEyS26xSJHISzoEbDSIPlY53ZGRzS+Pf2hPg38MfG3h34b+OvHVppfibxZJFFo2mtDNJNeNLMIYwojRgN0h2jcRk59KACb9oT4N2/wAYoPgDN46tF+IFzGZYtD8mbzWUW7XGd+zy/wDUoz/e6D14r0Svmy90v9i0/tpWGpXklp/w0MLci0X7ZqPm+V/Z0gP7oN9kP+h+Z1XOOfvYr0P42/tNfAv9nWztbv4xfESw8PvfgtaWpjluLq4UHBZIIVeQqCQC23aD1IoA9Qoryv4H/tRfAb9o2C7k+DvxEstem09VkvLPyZra6gU8BmgnRJNueN4BXPGap/HD9rj9nf8AZzubbT/i98SrLRtRvYvOg0+OCa7u2jyQHMMCO6ISCAzhVJUgHg0AewUVwXwd+PHwi+P3h2XxT8H/AB1YeJNPt5BDcNAHjlt3IyFlhlVZYiQCRvUZAOM13tAH4+/tMfHr9s7W/wBvDxX+z38B/ixrVm1xqMNto2lJdQQQJjT453AeRcKOJG5PU1W8dfHD/gqZ+xe+g+Ovjbrn9r+F73UBZmC/ksL62upcGQ27ywDzoWZI3KkMOFbGcEVf/wCc23/ce/8AcFXvv/Bav/k1nwt/2UCx/wDTdqNAH1pon7QXw5vfgHpH7Rmvasuh+EtR0a01m4uLgNJ9iWcIPLfy1JLLI/lnaOoPaqeoftUfs/6X8JdN+O2ofEqxh8B6xdNZWOtG3uDFNMsksZQII/MB3wSjlQPkPtXlf7Mvg34c+P8A/gnf4F8J/Fy2t5/B154SifWFub2S0iFvFIZSzzRujRqpjDFgw4HPGa8wPxg/4JO+K/h/pH7JNx4y0x/BWj6ibjTdPnn1u3so7t5p5Gb+0WK5XfPK255vL/eDBIACgH3P4Z8SaJ4y8N6T4u8M6gl9o+uWMGpafdIrBZ7aaNZIpAGAIDIynBAPPNaded+IvGXwc/Zi+E+kz+ItatvC3gbw3a2WiafLKZ7lIIUjWK3i3API/wAqKNzEk4ySTzWBqP7YH7N2l6l4I0Wf4qaZJqXxGksY/DdlbxTTXF4Lx1S2do0QtBG5cYeUIvXmgD2OivLfEX7UPwB8I/Eib4R+KPidpWl+LLa0kv5tPulkj8q3jtWunkeUr5SqIEdyS/QevFYfwh/bU/Zi+O3jCfwD8LfirZavr0Ku6Wclnc2jXKIuXaAzxoJtoDEhCSApbG3mgDf+IP7THwR+FnxI8L/CPx542/szxZ4zkt4dD0/+zbub7W88/wBniHmxRNFHul+X52XHU4HNen1+YH/BQiSOH/go3+zDNNIqImoeH2ZmOAoGu8knsK+xfCP7dn7Jvjz4kR/Cbwp8ZtKv/Ek8/wBltohb3CW91PnHlQ3LxiCVicBQrnduAXcc4AO6+MHx8+EPwD0zT9Y+L3ja18N2WqTta2c1xDNIJZVXcVHlIxGBzzVbx1+0b8Ffhp4j8M+EfHPj200nV/GPljQ7WWCZmvfMkWNNpRCBl3UfMR1rlv2t/AH7LPi/4e2+uftZQ2H/AAivhy6NzbzXmqXdksdxIpXCfZZEkldlyAg3E4OBXkmjfEj/AIJw/tkfFLwetr4isvEXjfwayHwvFdy6tpUi+TIJU8lJDDHckGIPtIdsKcjGaAPqH4nfFb4d/BjwnP46+KHi2x8O6HbusTXd0xw0jZKxoigvI5CkhFBY4PHFc58Dv2mPgj+0jZ6tf/Bfxt/wkUGhSRQ6g39m3dp5LyhigxcxRlshG+7nGOa/Oz/gtR8W/BPiCbwb8I9C8VJc+IfC2o3N1r2kosgNr51rbvbO5KhGJjkYjaTgMelfaX7LfiT9iXQvBvirVv2ZdV8M6d4e0VLeTxNfwCa2iiCRyGOW4luQucIJCXJ9STQB9IUV83+Gf+Civ7Gfi7xfF4I0X44aadSuJhbwPdWN5a2sshONq3M0Sw9cAEuAcjBNex/FD4sfD34L+E5fHPxP8TQaDoUM0dvJeTRyOqySHCLiNWbk+1AHW0V45qP7YH7N2l6l4I0Wf4qaZJqXxGksY/DdlbxTTXF4Lx1S2do0QtBG5cYeUIvXmvY6ACiiigAooooAKKK+Vv2jv+CjnwM/Zf8AiQ3wv+IXh3xteaqtjBqHnaTYWstv5cu7aN0lzG24bTn5cdOTQB+W/wCxn/yki8Mf9jfq/wD6Kuq/fGv5y/2ffjj4R+Ff7XGjfHjxFY6rP4e0/Xr/AFOWCzhje7MUyTqgCM6oWBlXI344PJr9O/8Ah9J+yn/0JvxP/wDBTY//ACZQB8Fft5f8pFPFX/YwaN/6T2tfvdX85v7TPxz8IfGT9q/W/jl4XsdWt9A1HVNPvYoL6GNLsJBFCjhkR2QEmJsYc9R0r9Of+H0n7Kf/AEJvxP8A/BTY/wDyZQB82f8ABbf/AJLd8P8A/sVX/wDSuWv0q/Y5/wCTUvhJ/wBifpf/AKTpX42/8FFv2sPhv+1p8RvC3i34a6V4hsbPRdFbTrhNatoYZGlM7yZURSyArhhySDnPFfXvwB/4K0fs2/C34I+Bfhx4i8K/ESbU/DWgWWl3klnplm8DywxKjGNmu1YrkHBKg+woA3/+C2v/ACQnwF/2Np/9I567/wD4JA/8mc2n/Yx6n/OOvi3/AIKK/t7/AAa/a0+Gnhjwf8NdC8XWN7o2u/2lcPrVlbwxtF9nkjwpinkJbc44IAxnmun/AGD/APgo/wDAv9mD4AQ/C/x/4b8b32rxateX5k0iwtZYDHKV2gNLcxtu+U5+XHvQB7H/AMFuf+SN/Dv/ALGab/0levTP+CQ3/Jm2nf8AYwap/wCjFr4j/wCCi37eXwd/a2+H3hPwv8NdB8XWF5omsSahctrVnbwoY2gZAFMU8hLZI6gDHeux/YQ/4KQfAn9mT9n+0+FvxA8O+NrzV4NUvL1pdJsLWW32SsCoDSXMbZ45+WgD7v8A+CjX/Jk/xT/7Blv/AOlkFfF//BDn/kNfFz/r10f/ANDuquftZ/8ABUr9nj46fs7+NfhP4P8ADHj621jxFZxW9rLqGnWkdurLcRSHeyXTsBhD0U84r57/AOCb/wC2V8Lf2RdQ8dXXxM0fxNfp4mhsI7MaLawTFDA0xfzPNmjxnzFxjPQ9KAP3I8Sf8i7qn/XlP/6LNfhf/wAEo/8Ak9/w1/2D9Y/9JJa+3dW/4LNfssX2lXtjD4P+JokuLeSJS2k2OAWUgZ/0zpzX5s/sR/Hvwb+zh+0do/xc8dWOr3ejWFrfwyxaXDHLclpoHjTCySIpALDPzdPWgD+iqvwK/aQ/5SXa3/2UbT//AEfBX35/w+k/ZT/6E34n/wDgpsf/AJMr8wfi58bvCXjz9sDUfj5o9lqsXh278W2uuxwXEMa3gt4pImZSiuU34Q4G/HTmgD+jeivlr9m3/got8Dv2pPiK/wAMfh54d8a2Wqpp02pmXV7G1hg8qJkVhuiuJG3ZkXA246819S0AFFFFAH89/wCw7+z18bv2hPE/ifSPgn8Wm8B3mkWENzfXA1G7tPtMTyFVTNsCWwQThuK/TP8AY4/Y5/ai+BHxam8bfGL9oZvG2gyaPcWK6adZ1G623DyRMkuy4GzgI4z1+bjvXzB/wRB/5Kb8Tf8AsA2X/pQ1fr5QB+Qv7CvwJ+GH7T/7UH7Qev8Ax08Np4rfTdTuGggup5VjEt1e3IeT5GU7lWIKnPy7iRghSO1/4JM2P/CE/tGftC/DLRbq4GgaPeGC3t5JC3/HtfXEMTn1bYSCe9UP+CYvjTwn4D/aY/aL0Hxt4k03Qb251F2ij1K6jt932e/ulmALkAlTKmR71o/8ErtQs/EX7V37R/ijQ7hb3Sb+9muLa8i5jkjm1K4eJgfRlBI9gaAPIf2G/wBln4f/ALTX7S/xij+KjXt/4a8K6xNePocN1JbxX93LeXKRPK0bBtsarNwCCTJ1A3BvcP8AgrJ8M7H4T/sk+APh/wDCfw5Jo3gPRvFTtcWVo0kkNu8sdxJGXZizbWllmPzHG5wOu0VV/wCCTH/JwH7SX/YTh/8AS2+r61/bO/aX+Cv7PHgfTrP47fD/AFzxZ4b8aST6bJZ2Gm2t7AxRVcrOlxNGuCDlcZOUJ4xmgD5R0X9k/wDYb/bA8J+ALv8AZr+J+leAfFXhmziku4tLhQ6tMyohDXVtJIjmWORGbzxnOW+ZhtIwP+C0Xwt8D6JoXgz4qWegW8fi/X9VOn6rqqNIHuoYbQCNShYooG0YwM+5rzv/AIKF/s1/s9/s5+H/AAL8fv2YfGNxoWra5rEUmn6fp+rmePyPKlmGoWjsxljCSJGh+crmRQAuCD6d/wAFbtX1rxN+y38DfFGvW7R6hqdxDeXw8vaI7mbTld1IxhTu3cex9KAPcP2lvgh4X+Cv/BPH4m6H+z34NGhPq+k2WpalBYySyGaMy2q3sh8xmIH2RZd2ONoNfLH7LvwV/YX/AGm/2U9D+EN34u0Hwf8AGX7Y8t1ql0qJqr3AuWYLEsjoLqF7cqgjRjt+8RuU1+iXjf8AaW+Fvwn/AGcT8bL64m8W+F9IstOivB4ba3vpMXBiiXhpUjxmVM7nHB79K+B/2ov2ef2Ifit+yfqX7YXwTh/4QK+kgF1badFcRRRXN154iazmsld0hlJyAsDKBwxDDNAHpX/BSDQ9e/Z7/wCCd/g34N2Pi671mJNb0vwtdag8fkPdWUUF1cRqyBm4BtYVxu/gH0rwf9pD4b/sOaP+wT4Yvvhj4k+H9x8UtLsdGupzpviC1n1i6uLjyxepcRJIZHCmSQ7Cv7vYANoBFWP2gfE3j/4pf8EifhL4t8XXF7qt9pnjRY7i/uCzySWcA1O0hkdjy2Mwx7jySASSSa9Nj+CX/BLPwH+y54M+PHxC8DQawuq6Tpq3S6X4o1GS8udQkjQXCrbi9QB0k8zegA2bW4GMUAbH7R3iTVfFn/BHXw1rut3UlzfTaP4bjmmkbc8piu4YwzHqWIQEk8kk5re/4J9/sI/Am++CfgT46fELQZ/FfjXVo4NatL29vrhY9MWKT/RYoI0cLiNYo+XDcggYXC1L+2nN8Obn/gljFdfCHQ77RvBdxb6FNodjemQzw2jX0TRhjI7ucg5yXbgjmvof9gn/AJM5+E3/AGLsP/oTUAfKvxP09vgN/wAFevAXjmFTFpHxb01LO6I4V7mSB7Lyx6HzobOQ+u/1NOvLEfHr/gsYn3rnSfg7oEUkjY3IZIoN6gHopW71AfUxN9a6/wD4K4eF77S/hz8OP2hNAtRJq3wu8X211uzt2W8zI2Scf8/Fvaj/AIGapf8ABKvT5PiHrXxz/ap1C1nSX4heMJrfTxcf6yG2R3uXUYOMZuok4JAMGB0NAHC65/ynE8Pf9g1//UauK53XPh/4b/aQ/wCCwHiXwZ8XLIa54d8PWCtBpczP5DxQadC0cRwwITzpmlIzhmLAjDEV0Wuf8pxPD3/YNf8A9Rq4qj4R8QaL4H/4LQ+NH8XalbaRFq1m1raTXkqxRySS6XbPEu9iBlwpC88sQo5OKAPYfD//AAT18QfCX9t3w/8AtAfAW48LeGfh1b2/l6roJvbpbljJbyQzpDF5LxmMkxSBWlUBwSAuFr5n+GMnwF+KX/BSL45+IP2tNe8KrpHh6/1Ww0iHxZqsFtYyy2t6tnCmJ2VJClvGxWPkD72CVBr7f1z9vHwfaftcaF+yf4Y8Lf8ACSXurbFudbsdWjaGxlMUkskbxhDuZI4wzAOPvY4Ir4R+C/wX+AnxP/4KMfHr4eftMaLaXEN1rWvajodre6rcaf51w+peapR4ZYy7G3kZwhJyu444yADsf2JX8B+Af+CnfxE8D/AvWrC7+Hmq6PdizGmagt5ZPGEtrhfLlVmVxHIZEU7iVBZc9c/rBXwr+zJpv/BPXwj+1Zq3w2/Zz+HeqW3xB8PWF3Hcaxb6neX2mi3AjE6rJLdyI3zOiZ8vIYEZFfdVAH5B/wDObb/uPf8AuCr33/gtX/yaz4W/7KBY/wDpu1Gvmvxb4u8L+A/+Cyt74u8aeILHRNF07XFe7v76ZYYIFbRAoLu3AyzKOe5Felf8FbP2kvgT8VvgD4X8F/DP4p+HvFOsJ4wt9Ukt9JvFufKtorK8jZ3ZMhfnnjABOTk46HABY+N2salpP/BGfwVDp908C6lY6NZ3Ow4Lwm63lcjsTGufUZHevN/jN+yX8DfCn/BL/wAJfGzRfCCweOJLPR9WuNaFxIZrh72WNZY3UtsMYWUBVCjbsBHJbd6V+0boOsab/wAEdPAdrfafNFLbWXh+6mRlwY4pZsozDtnzY/8AvoVmfHr4qfDjVP8AgkP4M8N2HjbRp9Yn0zw/piafHeRtcm5tp4zPGYgSwKCGQnIHA9xkAv8A7Smralrn/BHn4e6jq15JdXLW2gRNLI2WZY5DGmSeThVUZ9q9P/YJ/YS+BNr8H/hv8dvGegz+KPHmo2un+JLXVL29uAunMmyS0igiVwgEKpCMsGyU7LhR5T+0LBNb/wDBG/4dx3ETRsbfQpAGGCVaVmU/Qggj2NfcP7Ff/JpHwh/7E7TP/SdaAPgD42/DLwj8Yv8Agsdpfw88d6eb/QdStLea8tfMZBcLb6HJcLGxUg7GaFQwzypI71kftFfCzwF+zj/wVA+BOlfBnw7B4a0/W7nw1d3Nnas3kiS51Weym2An5Q0MYBAOMlj3Neha5/ynE8Pf9g1//UauKyP2+v8AlKb+zl/3KH/qRXVADP8Agp14T0vx9+3Z+z94F1zzf7O8RrpGk3nlOUfyLjWGifawIKna5wQciuG/4KsfAv4Ufsz+KPg94u+B/g208J3t82pyTrZO4jeSxksnt5MFiQ4M75YHJwvpXqf/AAUE/wCUj/7L/wD2EvD3/p+rI/4Lnf8ANE/+5k/9xtAGr/wWMS68TfET4B/Dm7v54tH1jUL1biOI4y8k9nD5nPBZUdwuem5vWvPP+Cj37P3wo/Zd+KPwE8T/AAI8Lr4TvL/ULjzvstxK4MtjPYtBN+8Zj5mZ3y3VsDOTXoP/AAV/u4tB+MH7PHijVA8WmWN9eTT3G3KqsV1Yu/4hecVkf8FcPHHg3x98Qv2fdF8DeKtJ8Q3tve6jNLDpd5HdFUuZtOWAkxkj94YZNvrtNAFH/gtV8LfAPhy+8E/E/RfDcFr4o8XX15FrWorJIXvFtra1jgDKWKjYgAG0Dpzmu8/4KVfCf4Zfsufse3fh/wCBfg+DwpZ+PvGGl6driWlzM32qKK3u7hA3mOxwHgXgYz3rM/4Lif8AIo/CX/sJat/6Ktq9I/4LP6ZfX/7KOh3VpbvJFpvjiwurplHEURs76IMfbfLGv1YUAfMH7SHw3/Yc0f8AYJ8MX3wx8SfD+4+KWl2OjXU503xBaz6xdXFx5YvUuIkkMjhTJIdhX93sAG0AivWv2pPEmq+LP+CQvgDXdbupLm+mtfD0c00jbnlMTGMMx6liEBJPJJOaij+CX/BLPwH+y54M+PHxC8DQawuq6Tpq3S6X4o1GS8udQkjQXCrbi9QB0k8zegA2bW4GMV0/7dU3w5uf+CYPh+6+EOh32jeC7ifRZtDsb0yGeG0aUtGGMju5yDnJduCOaAOk/YJ/YS+BNr8H/hv8dvGegz+KPHmo2un+JLXVL29uAunMmyS0igiVwgEKpCMsGyU7LhR96V4t+xX/AMmkfCH/ALE7TP8A0nWvaaACiiigAooooAKpXWi6NfTfar7SLK4mwB5ktujtgdBkjNXaKAPxd/ZZ/ZN/aC8Mft1eH/HHiz4JeJLDwpb+JtTuZr+704i1SBkuBG5J42ksmPqK/Y7/AIRbwz/0Lml/+Acf+FalFAH4v/th/sn/ALQPi79t7xF418F/BPxHqPhe51rS5ob6y04tavGkNusjAjjAZXz9DX7GHwv4ZPJ8O6YT/wBecf8AhWpRQB+Vv/BWH9mn4wfFL4seC9U+Dvwh1nXtPs/Dr291No+n7o45vtMjbW2jG7aQfoa+8P2Yfh5H4b/Z0+Gvh7xd4Pt7LWtN8Mafa39td2aCaGdYVDo4IyGDZz717FRQB8F/8FX/AIE+Ofil8H/B2j/B34Z3mvajZ+JTc3UGj2IaSOE2sq7mCj7u4qPriuw/4Jo/BbXvAH7LcHhP4ufDhtJ1n+3NQlkstY09RKYXKbSVcH5Tg4+lfYlFAHwH/wAFYPgL46+KHws8D6T8Gvhhea7e2OvyzXUOjWAZ4oTbMoZgoGFzgflXff8ABNH4O+Ivh1+y7Y+Gfir8PZdG12PWtQma01WxVZxGzrsbDDOCBxX19RQB87/tyfC+68afso/ETwv8P/A6an4gv7CFLG00+xVriVxdQsQgUZJ2hjx2Br5Z/wCCSf7OvxS+FWqfEuT4y/CjVNAj1K30xLE6xYbRMUacuE3DnG5M49RX6XUUAc9rfhPw/LouoQ2vhvTmlktZkRVs48klCABx3zX5Ff8ABOf9lH4+fD79rTQfFXxO+CniLR/D0FnqazXmp6cVt0ZraRUBLcZLEAV+y1FAGX/wi/hn/oXdL/8AAOP/AAr8bvjr+yb+0Hrn7emr+OvD/wAEfEl14Sl8dWV7HqEGnE2jWqzQl5ARxsADZPTg1+0tFAFK10XR7GY3VjpNnbzEEGSK3VGIPXkDNXaKKACiiigD5w/ZY/YR+EX7Iuu674g+G3iLxfqVx4gtIrO6XXLy1mREjcuCght4iDk85J+lfR9FFAHx5+0J/wAEuf2d/wBoDx5efEq6v/EfhXXNVkM2qNotxD5F7KQAZWjmjcLIcclCoYkkgsSa9k/Zp/ZZ+E/7Kfg658IfC+xvCdRmW41LUtQmWa8vpFBVDI6qqhVBIVVVVG5jjLMT6/RQB4T+zz+xz8Mv2afGHjfxt4F1zxPf33j2dbjUo9WureWKJllllAhEUEZUbpnHzFuAPcntvjl8Cfht+0V8P7v4b/FLRP7Q0q4kWeKSNvLuLO4XISeCTBKSAMwzyCGZSCrEH0CigD4V+Hf/AAR5/Zf8D+LrTxRrGseL/FsFhMs8OlavdW4tJGVsr5whhRpQCB8u4K3IYEHFfUPx8/Z8+Gf7Sfw8m+GfxQ0ma50tpkurWa1l8m4srlFZUmhfBCuFd15BUhiCCDivSaKAPAvgP+xP8GPgH8KvFHwZ0f8AtnxP4X8YXMlzqtt4kmguDLvhSJkBhhiAXbGpHG4NyCOMeA/8OX/2X/8AhJP7W/4S7x//AGX5/nf2T/aFts25z5Xm+R5mzt134/iz81ffdFAHBax8CfhPrnweb4B6h4Lsm8Cf2bHpSaQpZUjgjx5e1wd4dWVXEm7fvG7O7mvkTR/+CMn7L2m+KItavvFHjvVNMim87+x7m/t1ikGc+W8kcCylO3ysrdPm9fviigDy744fs6+APjx8Gp/gV4ik1LRfDMq2cca6G8UEtvHayI8UcZkjkRVHlquNh+XgY610Xwj+GOg/Bj4a+HvhZ4XvNQutJ8NWS2NpNqEiPcPGpJBkZERS3PZQPauvooA4r40fCPwr8d/hf4g+EvjZrxNF8R2629zJZuiTx7ZFkR42dXUOrojAlSMgcVQ+APwM8Gfs4fCzSfhH4Bm1K40jSHuJI7jUpY5LqZ5pnldpGjRFJy+BhRhVUds16JRQB4Rdfsc/DG8/aqs/2vZNd8UDxjYwG3jsVurf+zCpsXsuY/I83PlyMeJfvAHp8tYX7U37AfwL/aw1Sz8UeM11fQ/EllCLYaxos0cctxACSsc6yI6SBcnBwGGcbsDFfSlFAHzL+y3/AME+vgT+ynrdx4v8If2zrvia4he2XVtanjke2hY/MkKRoiJuAALYLHkZAJFUf2nP+CcfwB/ah8WD4geJJNc8OeJ5I44bvUdEniT7ciKFTz45Y3VmVQFDqFbAUEkKAPqiigDwD9lf9iX4Mfsj22ozfD2LVNR1rWI1hvtZ1adJbmSFW3CFAiokce7nCrkkLuLbVx7/AEUUAfHHxu/4JZfs+/Hr4pa/8XPGHjD4hWeseIpo5rqDTdQsY7ZGSFIhsWS0dwNsak5Y8k/SsnwF/wAEgf2SfBPiK28Qag3jLxatrIsqafr2pW72jMpyN6W9vEXGeqsxU9CCMivt2igDnfHXw98HfEnwPqnw48Z6FBqPh3WbQ2N3YtlEaLjAUqQUKkKVKkFSoIwQK+KdM/4Iy/svWPildbvPFHju/wBLjuPOGjzX9usLLnIieRIRKU7cMrYx82eT98UUAeTfHb9mf4c/H/4PR/A7xJLqmh+GYHs2t00GSG3kgS2wIo08yKRFQAAY29AMYrsfhf8AD3RfhN8O/Dnwz8O3V7c6X4X02DS7Oa9dHuHiiQIrSMiqpYgckKo9hXUUUAeEXX7HPwxvP2qrP9r2TXfFA8Y2MBt47Fbq3/swqbF7LmPyPNz5cjHiX7wB6fLVb4vfsU/Cz40fH3wV+0Z4p1/xXa+JPAn9m/2da6fdWyWMv2K9kvIvOR4HkbMkrBtsi5UADaea+gKKAPCPjF+xz8Mfjb8bPAfx48Va74otNf8Ah5PZ3Gl22n3VulnM1td/ao/PSSB3YGTg7XX5eBg81W/au/Yp+Fn7YX/CLf8ACzNf8V6Z/wAIl9t+xf2FdW0PmfavI8zzfOglzj7Mm3btxls54x9AUUAeWftE/s1/Cv8Aah8EJ4F+Kml3M1tbT/arG8sp/Ju7GfaV8yJyCM4JBVlZTxlTgY8E+BP/AASn/Zz+B/xA074kDVPE3izVNGmW502HWp4Da2068pN5cUSF3U8ruYqDg7cgEfZ1FAHhH7VX7HPwx/a+03w7pfxK13xRpsXhme4uLRtDureFnaZUVvM86CUEARrjAHU9a9S+JHw48F/FzwPq/wAOfiFocOr+H9cg+z3lpIWXcMhlZWUhkdWCsrKQVZQQciulooA+B9H/AOCMn7L2m+KItavvFHjvVNMim87+x7m/t1ikGc+W8kcCylO3ysrdPm9fqD48fs0fDv8AaC+ECfBHxNNqmieGoZLR4F0KSGCWBbbHlRp5kUiBAABjb0AxivWKKAOX+F/w90X4TfDvw58M/Dt1e3Ol+F9Ng0uzmvXR7h4okCK0jIqqWIHJCqPYV1FFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQAUUUUAFFFFABRRRQB/9k=" alt="Forstservice Dörnhöfer"><small id="count"></small></div>
+  <div class="headBtns">
+    <div class="langSwitch">
+      <button id="langDE" class="headBtn" onclick="setLang('de')" title="Deutsch" aria-label="Deutsch">🇩🇪</button>
+      <button id="langRO" class="headBtn" onclick="setLang('ro')" title="Română" aria-label="Română">🇷🇴</button>
+    </div>
+    <button id="btnLocation" class="headBtn" onclick="locateMe()">📍 Mein Standort</button>
+    <button id="btnFeedback" class="headBtn primary" onclick="exportFeedback()">⬇ Rückmeldung</button>
+  </div>
+</div>
+<div id="mapmsg">Eine Kartenebene konnte nicht geladen werden. Bitte ggf. zwischen Karte und Satellit wechseln.</div>
+
+<div id="planner">
+  <div class="prow">
+    <b>Truppplanung:</b>
+    <span id="selCount">0 ausgewählt</span>
+    <span id="viewCount"></span>
+  </div>
+
+  <div class="filterrow">
+    <div class="fitem"><small>Netzbezirk</small><select id="fBezirk" onchange="applyMapFilters()"></select></div>
+    <div class="fitem"><small>Inspektion</small><select id="fInspektion" onchange="applyMapFilters()"></select></div>
+    <div class="fitem"><small>Strecke</small><select id="fStrecke" onchange="applyMapFilters()"></select></div>
+    <div class="fitem"><small>Objekt</small><select id="fObjekt" onchange="applyMapFilters()"></select></div>
+    <div class="fitem"><small>Status</small><select id="fStatus" onchange="applyMapFilters()"></select></div>
+    <div class="fitem"><small>Trupp</small><select id="fTrupp" onchange="applyMapFilters()"></select></div>
+    <button onclick="resetMapFilters()">Filter zurücksetzen</button>
+  </div>
+
+  <div class="prow" style="margin-top:7px">
+    <input id="planTrupp" placeholder="z. B. Trupp 1">
+    <button type="button" onclick="selectAllPositions()">Alle markieren</button>
+    <button class="assign" onclick="assignSelectedToTrupp()" data-i18n="assign">Auswahl zuweisen</button>
+    <button onclick="clearSelection()" data-i18n="clear_selection">Auswahl lösen</button>
+  </div>
+  <div class="prow" style="margin-top:6px">
+    <button class="download" onclick="downloadCurrentTruppMap()" data-i18n="save_plan">Truppplanung speichern</button>
+    <button onclick="exportTruppPlan()" data-i18n="export_plan">Truppplanung exportieren</button>
+  </div>
+  <div class="hint" data-i18n="select_hint">Linksklick = auswählen · Rechtsklick = Details anzeigen</div>
+</div>
+
+<div id="objLegend"></div>
+
+<div id="map"></div>
+
+<div id="panel">
+  <div id="panelHead">
+    <div><h2 id="pTitle">Position</h2><small id="pSub"></small></div>
+    <button id="closePanel" onclick="closePanel()">✕</button>
+  </div>
+  <div id="panelBody">
+    <div id="pBadges"></div>
+    <div class="row"><b data-i18n="district">Netzbezirk</b>: <span id="pBezirk"></span></div>
+    <div class="row"><b><span data-i18n="route">Strecke</span> / km:</b> <span id="pStrecke"></span></div>
+    <div class="row" id="baumartRow"><b data-i18n="tree_species">Baumart</b>: <span id="pBaumart"></span></div>
+    <div class="row"><b data-i18n="measure">Maßnahme</b>:<br><span id="pMassnahme"></span></div>
+    <div class="row"><b data-i18n="reason">Betrieblicher Grund</b>:<br><span id="pGrund"></span></div>
+    <div class="row" id="inspectionBlock" style="display:none"><b>Inspektionsdaten</b><div id="pInspection" style="margin-top:4px"></div></div>
+    <div class="row" id="treeNotesBlock" style="display:none"><b>Arbeitsnotiz je Baumart</b><div id="pTreeNotes" style="margin-top:4px"></div></div>
+    <div class="row"><b data-i18n="crew">Trupp</b>: <span id="pTrupp"></span></div>
+    <div class="row"><b data-i18n="source">Quelle</b>: <span id="pQuelle"></span></div>
+    <div class="row"><a id="pMaps" class="maps" target="_blank" data-i18n="maps_open">Google Maps öffnen</a></div>
+
+    <div class="row"><b data-i18n="status">Status</b>:</div>
+    <div class="statusBtns">
+      <button id="sOpen" class="statusBtn" onclick="setStatus('Offen')" data-i18n="open">Offen</button>
+      <button id="sDone" class="statusBtn done" onclick="setStatus('Erledigt')" data-i18n="done">✓ Erledigt</button>
+      <button id="sMissing" class="statusBtn missing" onclick="setStatus('Nicht gefunden')" data-i18n="missing">? Nicht gefunden</button>
+    </div>
+
+    <div class="row"><b data-i18n="note">Notiz</b>:</div>
+    <textarea id="pNote" placeholder="Notiz zur Position …" oninput="saveNote()"></textarea>
+
+    <div class="row"><b data-i18n="photos">Fotos</b>: <span id="photoCount"></span></div>
+    <div class="photoTools">
+      <button class="photoBtn" onclick="document.getElementById('cameraInput').click()" data-i18n="take_photo">📷 Foto aufnehmen</button>
+      <button class="photoBtn" onclick="document.getElementById('galleryInput').click()" data-i18n="choose_photo">🖼️ Foto auswählen</button>
+      <input id="cameraInput" type="file" accept="image/*" capture="environment" style="display:none" onchange="addPhotos(this.files,'cameraInput')">
+      <input id="galleryInput" type="file" accept="image/*" multiple style="display:none" onchange="addPhotos(this.files,'galleryInput')">
+    </div>
+    <div id="photos" class="photos"></div>
+
+    <button class="saveClose" onclick="saveAndClose()" data-i18n="save_close">Speichern & schließen</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const DATA=[{"nr": 1, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.7", "von_km": "49.7", "bis_km": "49.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.952811,12.022074&z=18&t=k", "lat": 47.952811, "lon": 12.022074, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 2, "uid": "fsd_2e77110cb4a2275980042de6"}, {"nr": 2, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "58.7", "von_km": "58.7", "bis_km": "58.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.889298,12.080626&z=18&t=k", "lat": 47.889298, "lon": 12.080626, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 3, "uid": "fsd_7ccda04a85f4b20b8453efa8"}, {"nr": 3, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "45.0", "von_km": "45.0", "bis_km": "45.0", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Stieleiche", "massnahme": "Totholzbeseitung (T)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Stieleiche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Totholzbeseitung (T)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.990171,11.992706&z=18&t=k", "lat": 47.990171, "lon": 11.992706, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 4, "uid": "fsd_6f7c806720dc18bbdfb92496"}, {"nr": 4, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "62.4", "von_km": "62.4", "bis_km": "62.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Vogelkirsche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Vogelkirsche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "28.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.866663,12.102788&z=18&t=k", "lat": 47.866663, "lon": 12.102788, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 5, "uid": "fsd_0792f569f830edafd07fd5bd"}, {"nr": 5, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "58.1", "von_km": "58.1", "bis_km": "58.1", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "21.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.891164,12.072846&z=18&t=k", "lat": 47.891164, "lon": 12.072846, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 6, "uid": "fsd_0671985ad1fb7fee62062a50"}, {"nr": 6, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "45.0", "von_km": "45.0", "bis_km": "45.0", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Stieleiche", "massnahme": "Totholzbeseitung (T)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Stieleiche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Totholzbeseitung (T)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.990209,11.992693&z=18&t=k", "lat": 47.990209, "lon": 11.992693, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 7, "uid": "fsd_155c6150529961ca8e8b2e68"}, {"nr": 7, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "51.9", "von_km": "51.9", "bis_km": "51.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Bergulme", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Bergulme", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.940483,12.044112&z=18&t=k", "lat": 47.940483, "lon": 12.044112, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 8, "uid": "fsd_599cc941d9cfd1439dddda99"}, {"nr": 8, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.0", "von_km": "49.0", "bis_km": "49.0", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.957989,12.016215&z=18&t=k", "lat": 47.957989, "lon": 12.016215, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 9, "uid": "fsd_cb68c76087a5662c1eb5437a"}, {"nr": 9, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "45.0", "von_km": "45.0", "bis_km": "45.0", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Stieleiche", "massnahme": "Totholzbeseitung (T)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Stieleiche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Totholzbeseitung (T)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.990209,11.992682&z=18&t=k", "lat": 47.990209, "lon": 11.992682, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 10, "uid": "fsd_ce307ebff7ce8acd99ac9f07"}, {"nr": 10, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "60.4", "von_km": "60.4", "bis_km": "60.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Schwarzerle", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Schwarzerle", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.884024,12.101694&z=18&t=k", "lat": 47.884024, "lon": 12.101694, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 11, "uid": "fsd_84048a39e12143a69e3a448d"}, {"nr": 11, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "44.2", "von_km": "44.2", "bis_km": "44.2", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Schwarzerle", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Schwarzerle", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.996308,11.989272&z=18&t=k", "lat": 47.996308, "lon": 11.989272, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 12, "uid": "fsd_0e352cfee0d1e9bba684ec16"}, {"nr": 12, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.0", "von_km": "49.0", "bis_km": "49.0", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.957928,12.016282&z=18&t=k", "lat": 47.957928, "lon": 12.016282, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 13, "uid": "fsd_90a9bee95cb1a1d25c5ba25d"}, {"nr": 13, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "58.7", "von_km": "58.7", "bis_km": "58.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.889314,12.080665&z=18&t=k", "lat": 47.889314, "lon": 12.080665, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 14, "uid": "fsd_f269cc08bd7721e2d40296dc"}, {"nr": 14, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "58.8", "von_km": "58.8", "bis_km": "58.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.889188,12.081305&z=18&t=k", "lat": 47.889188, "lon": 12.081305, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 15, "uid": "fsd_440fa433b6e54bfde34503ad"}, {"nr": 15, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "60.4", "von_km": "60.4", "bis_km": "60.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.88461,12.101119&z=18&t=k", "lat": 47.88461, "lon": 12.101119, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 16, "uid": "fsd_8065ceef2e1de1869566eaab"}, {"nr": 16, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5622", "km": "37.5", "von_km": "37.5", "bis_km": "37.5", "weitere_strecken": "5622", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "01.04.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5622", "streckenabschnitt_bis": "5622", "link": "http://maps.google.com/maps?q=47.847603,12.124887&z=18&t=k", "lat": 47.847603, "lon": 12.124887, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 17, "uid": "fsd_b3ac9b744e6c67e482dcde0a"}, {"nr": 17, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "54.3", "von_km": "54.3", "bis_km": "54.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.922185,12.058466&z=18&t=k", "lat": 47.922185, "lon": 12.058466, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 18, "uid": "fsd_3e252e1063b90fd57f9a9320"}, {"nr": 18, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "44.6", "von_km": "44.6", "bis_km": "44.6", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Grenzfeststellung (G), Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Grenzfeststellung (G), Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.993563,11.991218&z=18&t=k", "lat": 47.993563, "lon": 11.991218, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 19, "uid": "fsd_f111b6473a947c04a579c160"}, {"nr": 19, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "46.9", "von_km": "46.9", "bis_km": "46.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.975467,12.005416&z=18&t=k", "lat": 47.975467, "lon": 12.005416, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 20, "uid": "fsd_634fe5cd7fc1cff31f4cc39a"}, {"nr": 20, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.5", "von_km": "47.5", "bis_km": "47.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.97042,12.007792&z=18&t=k", "lat": 47.97042, "lon": 12.007792, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 21, "uid": "fsd_d5723e4741aa26fc64321d22"}, {"nr": 21, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.2", "von_km": "49.2", "bis_km": "49.2", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Schwarzerle", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Schwarzerle", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.956477,12.018036&z=18&t=k", "lat": 47.956477, "lon": 12.018036, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 22, "uid": "fsd_de0dc61f6e7e1f5ee3a21213"}, {"nr": 22, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "56.7", "von_km": "56.7", "bis_km": "56.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "28.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.900808,12.061661&z=18&t=k", "lat": 47.900808, "lon": 12.061661, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 23, "uid": "fsd_226702eb3fbb835ee5c3fd08"}, {"nr": 23, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "44.7", "von_km": "44.7", "bis_km": "44.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Winterlinde", "massnahme": "Totholzbeseitung (T)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Winterlinde", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Totholzbeseitung (T)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "12.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.99214,11.992202&z=18&t=k", "lat": 47.99214, "lon": 11.992202, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 24, "uid": "fsd_a61c244c3dd471ce0ddb1d01"}, {"nr": 24, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "48.4", "von_km": "48.4", "bis_km": "48.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Zitterpappel", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Zitterpappel", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.962287,12.011758&z=18&t=k", "lat": 47.962287, "lon": 12.011758, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 25, "uid": "fsd_18866e438c2857fb6a1979d6"}, {"nr": 25, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "63.4", "von_km": "63.4", "bis_km": "63.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "29.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.858455,12.105414&z=18&t=k", "lat": 47.858455, "lon": 12.105414, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 26, "uid": "fsd_fba97d4169b5416598772b83"}, {"nr": 26, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.2", "von_km": "49.2", "bis_km": "49.2", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.956248,12.018201&z=18&t=k", "lat": 47.956248, "lon": 12.018201, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 27, "uid": "fsd_1a1b0515ff57cb70012c57e7"}, {"nr": 27, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "54.9", "von_km": "54.9", "bis_km": "54.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.916163,12.059999&z=18&t=k", "lat": 47.916163, "lon": 12.059999, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 28, "uid": "fsd_872706ab9b0150384847b48b"}, {"nr": 28, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.2", "von_km": "49.2", "bis_km": "49.2", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95615,12.018346&z=18&t=k", "lat": 47.95615, "lon": 12.018346, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 29, "uid": "fsd_b9f83bfc51907759c33199a2"}, {"nr": 29, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "56.7", "von_km": "56.7", "bis_km": "56.7", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "28.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.900816,12.061667&z=18&t=k", "lat": 47.900816, "lon": 12.061667, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 30, "uid": "fsd_7a0b89f4f1eb4242243eb731"}, {"nr": 30, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.956092,12.018365&z=18&t=k", "lat": 47.956092, "lon": 12.018365, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 31, "uid": "fsd_5c3c2def317314a29261080a"}, {"nr": 31, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95587,12.01854&z=18&t=k", "lat": 47.95587, "lon": 12.01854, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 32, "uid": "fsd_5b3144d67fbaad8445b394ef"}, {"nr": 32, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955876,12.01871&z=18&t=k", "lat": 47.955876, "lon": 12.01871, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 33, "uid": "fsd_b6fe5fb9b50193011713f1a8"}, {"nr": 33, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95584,12.018726&z=18&t=k", "lat": 47.95584, "lon": 12.018726, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 34, "uid": "fsd_3154526b725c7efc3f000535"}, {"nr": 34, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "53.9", "von_km": "53.9", "bis_km": "53.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.925506,12.057054&z=18&t=k", "lat": 47.925506, "lon": 12.057054, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 35, "uid": "fsd_2453df5e623f7c2e55de6bec"}, {"nr": 35, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95586,12.018776&z=18&t=k", "lat": 47.95586, "lon": 12.018776, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 36, "uid": "fsd_65120e0f8e8679e0082b1dbc"}, {"nr": 36, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955834,12.01878&z=18&t=k", "lat": 47.955834, "lon": 12.01878, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 37, "uid": "fsd_e3d0304a17d281e12be7ee92"}, {"nr": 37, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955809,12.018805&z=18&t=k", "lat": 47.955809, "lon": 12.018805, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 38, "uid": "fsd_75aeb2b50bd2b0d17d410aa0"}, {"nr": 38, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955782,12.018856&z=18&t=k", "lat": 47.955782, "lon": 12.018856, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 39, "uid": "fsd_d360f45f6796974b7fcad7f9"}, {"nr": 39, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955777,12.01886&z=18&t=k", "lat": 47.955777, "lon": 12.01886, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 40, "uid": "fsd_b395923ae576d65d0d27235c"}, {"nr": 40, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955625,12.018891&z=18&t=k", "lat": 47.955625, "lon": 12.018891, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 41, "uid": "fsd_a5ce47f070f5f2fc6b27b006"}, {"nr": 41, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955529,12.019008&z=18&t=k", "lat": 47.955529, "lon": 12.019008, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 42, "uid": "fsd_dfe5294aa67b0638b4e9d265"}, {"nr": 42, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955516,12.019006&z=18&t=k", "lat": 47.955516, "lon": 12.019006, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 43, "uid": "fsd_73cb2e28295ffcae6517f2cd"}, {"nr": 43, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955569,12.019057&z=18&t=k", "lat": 47.955569, "lon": 12.019057, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 44, "uid": "fsd_539ccda1506a0a08185f9d87"}, {"nr": 44, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.956117,12.018483&z=18&t=k", "lat": 47.956117, "lon": 12.018483, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 45, "uid": "fsd_10934188507a661eb41691d1"}, {"nr": 45, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.956142,12.018452&z=18&t=k", "lat": 47.956142, "lon": 12.018452, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 46, "uid": "fsd_4572805adf3d330014b15a74"}, {"nr": 46, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.6", "von_km": "47.6", "bis_km": "47.6", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.969522,12.008158&z=18&t=k", "lat": 47.969522, "lon": 12.008158, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 47, "uid": "fsd_f36b4347e3cf808cacf9c426"}, {"nr": 47, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.5", "von_km": "47.5", "bis_km": "47.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.969646,12.00811&z=18&t=k", "lat": 47.969646, "lon": 12.00811, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 48, "uid": "fsd_310459fe489d3cd02e34e582"}, {"nr": 48, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.5", "von_km": "47.5", "bis_km": "47.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.969769,12.008065&z=18&t=k", "lat": 47.969769, "lon": 12.008065, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 49, "uid": "fsd_010acdcf1d14740ce6f0c1f6"}, {"nr": 49, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.6", "von_km": "49.6", "bis_km": "49.6", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.953454,12.021854&z=18&t=k", "lat": 47.953454, "lon": 12.021854, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 50, "uid": "fsd_ea1bb57f411e20d3bb2c96c8"}, {"nr": 50, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.5", "von_km": "47.5", "bis_km": "47.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.970353,12.007753&z=18&t=k", "lat": 47.970353, "lon": 12.007753, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 51, "uid": "fsd_99ada37057df3dde689fed3b"}, {"nr": 51, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.9", "von_km": "47.9", "bis_km": "47.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.966598,12.009503&z=18&t=k", "lat": 47.966598, "lon": 12.009503, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 52, "uid": "fsd_204d91e9992ebebd7a0f55be"}, {"nr": 52, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.8", "von_km": "49.8", "bis_km": "49.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95266,12.022734&z=18&t=k", "lat": 47.95266, "lon": 12.022734, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 53, "uid": "fsd_bf6f60557bce21661142b4c3"}, {"nr": 53, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "48.6", "von_km": "48.6", "bis_km": "48.6", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "15.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.960791,12.013317&z=18&t=k", "lat": 47.960791, "lon": 12.013317, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 54, "uid": "fsd_c9fe36192009c36bf8268140"}, {"nr": 54, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.9", "von_km": "47.9", "bis_km": "47.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.966507,12.009599&z=18&t=k", "lat": 47.966507, "lon": 12.009599, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 55, "uid": "fsd_9f24aec3f06a4f85ec758b0e"}, {"nr": 55, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.8", "von_km": "47.8", "bis_km": "47.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Zitterpappel", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Zitterpappel", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.967835,12.009013&z=18&t=k", "lat": 47.967835, "lon": 12.009013, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 56, "uid": "fsd_5d6bb2cfdda17273eb335b98"}, {"nr": 56, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.8", "von_km": "47.8", "bis_km": "47.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.967608,12.009103&z=18&t=k", "lat": 47.967608, "lon": 12.009103, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 57, "uid": "fsd_5bb55a46ade20e36751d724d"}, {"nr": 57, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "50.9", "von_km": "50.9", "bis_km": "50.9", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Schwarzerle", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Schwarzerle", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.946472,12.035309&z=18&t=k", "lat": 47.946472, "lon": 12.035309, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 58, "uid": "fsd_e00023d0c727e36c7c60ec34"}, {"nr": 58, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "47.4", "von_km": "47.4", "bis_km": "47.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.970829,12.007724&z=18&t=k", "lat": 47.970829, "lon": 12.007724, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 59, "uid": "fsd_256f8110d317473aa95f7c6d"}, {"nr": 59, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934857,12.052904&z=18&t=k", "lat": 47.934857, "lon": 12.052904, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 60, "uid": "fsd_d4759e00429786454d492e67"}, {"nr": 60, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934783,12.052873&z=18&t=k", "lat": 47.934783, "lon": 12.052873, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 61, "uid": "fsd_1a51ee953214288db721319a"}, {"nr": 61, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934749,12.052918&z=18&t=k", "lat": 47.934749, "lon": 12.052918, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 62, "uid": "fsd_b1afd018aca601cc6b1a9e17"}, {"nr": 62, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934718,12.052906&z=18&t=k", "lat": 47.934718, "lon": 12.052906, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 63, "uid": "fsd_45db45cf84820cefb196eab7"}, {"nr": 63, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934811,12.05264&z=18&t=k", "lat": 47.934811, "lon": 12.05264, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 64, "uid": "fsd_89b90ac498bc772b3dd44a8f"}, {"nr": 64, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934854,12.052685&z=18&t=k", "lat": 47.934854, "lon": 12.052685, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 65, "uid": "fsd_7e0e040092accd0227f91122"}, {"nr": 65, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "52.8", "von_km": "52.8", "bis_km": "52.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "19.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.934939,12.052622&z=18&t=k", "lat": 47.934939, "lon": 12.052622, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 66, "uid": "fsd_e1ca8228daacb12864126304"}, {"nr": 66, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.8", "von_km": "49.8", "bis_km": "49.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.952369,12.022552&z=18&t=k", "lat": 47.952369, "lon": 12.022552, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 67, "uid": "fsd_9b5cad2e6bff2ee0f35ba94a"}, {"nr": 67, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.8", "von_km": "49.8", "bis_km": "49.8", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.952402,12.02246&z=18&t=k", "lat": 47.952402, "lon": 12.02246, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 68, "uid": "fsd_6fef121cb5a52de7c9274577"}, {"nr": 68, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.5", "von_km": "49.5", "bis_km": "49.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.954318,12.02039&z=18&t=k", "lat": 47.954318, "lon": 12.02039, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 69, "uid": "fsd_129c5a5fde97dd05a2a34699"}, {"nr": 69, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.5", "von_km": "49.5", "bis_km": "49.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.954339,12.020339&z=18&t=k", "lat": 47.954339, "lon": 12.020339, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 70, "uid": "fsd_54f6604eea0fcd314ce33b4f"}, {"nr": 70, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.5", "von_km": "49.5", "bis_km": "49.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.954399,12.020248&z=18&t=k", "lat": 47.954399, "lon": 12.020248, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 71, "uid": "fsd_eaea02a32e83a156b33d40d9"}, {"nr": 71, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.5", "von_km": "49.5", "bis_km": "49.5", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.954549,12.020054&z=18&t=k", "lat": 47.954549, "lon": 12.020054, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 72, "uid": "fsd_da2918d7eb384533a94ecc85"}, {"nr": 72, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955618,12.018947&z=18&t=k", "lat": 47.955618, "lon": 12.018947, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 73, "uid": "fsd_2e999603cef99215bca64218"}, {"nr": 73, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.3", "von_km": "49.3", "bis_km": "49.3", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "18.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955595,12.018872&z=18&t=k", "lat": 47.955595, "lon": 12.018872, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 74, "uid": "fsd_c5436c2e4c50f3fc8202351b"}, {"nr": 74, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.4", "von_km": "49.4", "bis_km": "49.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.955101,12.019563&z=18&t=k", "lat": 47.955101, "lon": 12.019563, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 75, "uid": "fsd_d564aaa41ffc00a5e37bfa7c"}, {"nr": 75, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "49.4", "von_km": "49.4", "bis_km": "49.4", "weitere_strecken": "5510", "objekt_typ": "Baum", "baumart": "Gemeine Esche", "massnahme": "Fällen am Wurzelanlauf (F)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Gemeine Esche", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Fällen am Wurzelanlauf (F)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "20.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.95496,12.019589&z=18&t=k", "lat": 47.95496, "lon": 12.019589, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 76, "uid": "fsd_294c5e2dd9f3be5fdc4575c0"}, {"nr": 76, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "58.6", "von_km": "58.6", "bis_km": "58.6", "weitere_strecken": "5510", "objekt_typ": "Veg. sonstig", "baumart": "Aufwuchs", "massnahme": "Beseitigung (B)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Aufwuchs", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Beseitigung (B)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "27.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.889826,12.07963&z=18&t=k", "lat": 47.889826, "lon": 12.07963, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 77, "uid": "fsd_3f5a095cdefe23c4de2cdd94"}, {"nr": 77, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "46.8", "von_km": "46.8", "bis_km": "46.8", "weitere_strecken": "5510", "objekt_typ": "Veg. sonstig", "baumart": "Aufwuchs", "massnahme": "Beseitigung (B)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Aufwuchs", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Beseitigung (B)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "13.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.976036,12.005457&z=18&t=k", "lat": 47.976036, "lon": 12.005457, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 78, "uid": "fsd_664213d4553c0681317ebd03"}, {"nr": 78, "original_nr": "", "be_nr": "", "obj_nr": "", "netzbezirk": "Rosenheim", "inspektion": "", "strecke": "5510", "km": "46.7", "von_km": "46.7", "bis_km": "46.7", "weitere_strecken": "5510", "objekt_typ": "Veg. sonstig", "baumart": "Aufwuchs", "massnahme": "Beseitigung (B)", "grund": "", "rkz": "", "abstand_gleis": "", "bhd": "", "hoehe": "", "anzahl": "", "art1": "Aufwuchs", "art2": "", "art3": "", "belaubung": "", "eigentuemer": "", "vsp": "", "befund": "", "massnahmenumsetzung": "Beseitigung (B)", "maschine": "", "dringlichkeit": "", "erledigungsdatum": "13.05.2026", "aufnahmejahr": "", "streckenabschnitt_von": "5510", "streckenabschnitt_bis": "5510", "link": "http://maps.google.com/maps?q=47.976569,12.005081&z=18&t=k", "lat": 47.976569, "lon": 12.005081, "status": "Offen", "notiz": "", "fotos": [], "trupp": "", "quelle": "G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_excel": "C:\\Users\\Jacob\\Documents\\G2_Baeume_5510_Handykarte_Deutsch.xlsx", "_source_row": 79, "uid": "fsd_949408fbd48946f9dda0eda4"}];
+const PLANNING=false;
+
+const I18N={
+  de:{
+    positions:'Positionen',
+    my_location:'Mein Standort',
+    feedback:'Rückmeldung',
+    objects:'Objekte',
+    status:'Status',
+    done:'Erledigt',
+    missing:'Nicht gefunden',
+    note_present:'Notiz vorhanden',
+    planning:'Truppplanung',
+    district:'Netzbezirk',
+    route:'Strecke',
+    object:'Objekt',
+    crew:'Trupp',
+    all:'Alle',
+    reset:'Zurücksetzen',
+    assign:'Auswahl zuweisen',
+    clear_selection:'Auswahl lösen',
+    save_plan:'Truppplanung speichern',
+    export_plan:'Truppplanung exportieren',
+    select_hint:'Linksklick = auswählen · Rechtsklick = Details anzeigen',
+    selected:'ausgewählt',
+    position:'Position',
+    tree_species:'Baumart',
+    measure:'Maßnahme',
+    reason:'Betrieblicher Grund',
+    source:'Quelle',
+    maps_open:'Google Maps öffnen',
+    open:'Offen',
+    note:'Notiz',
+    note_placeholder:'Notiz zur Position …',
+    photos:'Fotos',
+    take_photo:'📷 Foto aufnehmen',
+    choose_photo:'🖼️ Foto auswählen',
+    export_feedback:'Rückmeldung exportieren',
+    close:'Schließen',
+    map:'Karte',
+    satellite:'Satellit',
+    fallback:'Ersatzkarte',
+    enter_crew:'Bitte zuerst einen Truppnamen eingeben.',
+    select_points:'Bitte zuerst Punkte auf der Karte auswählen.',
+    assigned:'Positionen wurden dem Trupp zugewiesen.',
+    saved_plan:'Truppplanung wurde gespeichert. Jetzt im FSD-Hauptprogramm „Truppplanung importieren“ und danach „Handy-Truppkarte erstellen“.',
+    no_positions:'Diesem Trupp sind noch keine Positionen zugewiesen.',
+    photo_count:'Fotos',
+    tree:'Baum', area:'Fläche', other_veg:'Veg sonstig', save_close:'Speichern & schließen',
+    location_here:'Mein Standort',
+    location_unsupported:'Standort wird von diesem Browser nicht unterstützt.',
+    location_denied:'Standortfreigabe wurde nicht erlaubt.',
+    location_failed:'Standort konnte nicht ermittelt werden.',
+    local_location_blocked:'Diese Handykarte wurde lokal geöffnet. Der Browser darf hier den GPS-Standort nicht an die Karte übergeben.',
+    open_google_maps:'Google Maps stattdessen öffnen?'
+  },
+  ro:{
+    positions:'poziții',
+    my_location:'Locația mea',
+    feedback:'Raport',
+    objects:'Obiecte',
+    status:'Stare',
+    done:'Finalizat',
+    missing:'Nu a fost găsit',
+    note_present:'Există notă',
+    planning:'Planificare echipă',
+    district:'District de rețea',
+    route:'Linie',
+    object:'Obiect',
+    crew:'Echipă',
+    all:'Toate',
+    reset:'Resetare',
+    assign:'Atribuie selecția',
+    clear_selection:'Anulează selecția',
+    save_plan:'Salvează planificarea',
+    export_plan:'Exportă planificarea',
+    select_hint:'Click stânga = selectare · Click dreapta = detalii',
+    selected:'selectate',
+    position:'Poziție',
+    tree_species:'Specie arbore',
+    measure:'Măsură',
+    reason:'Motiv operațional',
+    source:'Sursă',
+    maps_open:'Deschide Google Maps',
+    open:'Deschis',
+    note:'Notă',
+    note_placeholder:'Notă pentru poziție …',
+    photos:'Fotografii',
+    take_photo:'📷 Fă fotografie',
+    choose_photo:'🖼️ Alege fotografie',
+    export_feedback:'Exportă raportul',
+    close:'Închide',
+    map:'Hartă',
+    satellite:'Satelit',
+    fallback:'Hartă alternativă',
+    enter_crew:'Introduceți mai întâi numele echipei.',
+    select_points:'Selectați mai întâi punctele de pe hartă.',
+    assigned:'Pozițiile au fost atribuite echipei.',
+    saved_plan:'Planificarea a fost salvată. Importați apoi planificarea în programul principal FSD și creați harta pentru echipă.',
+    no_positions:'Această echipă nu are încă poziții atribuite.',
+    photo_count:'Fotografii',
+    tree:'Arbore', area:'Suprafață', other_veg:'Altă vegetație', save_close:'Salvează și închide',
+    location_here:'Locația mea',
+    location_unsupported:'Acest browser nu acceptă localizarea.',
+    location_denied:'Accesul la locație nu a fost permis.',
+    location_failed:'Locația nu a putut fi determinată.',
+    local_location_blocked:'Această hartă a fost deschisă local. Browserul nu poate transmite locația GPS către hartă în acest mod.',
+    open_google_maps:'Deschizi Google Maps în schimb?'
+  }
+};
+
+let LANG='de';
+try{ LANG=localStorage.getItem('fsd_lang')||'de'; }catch(e){}
+if(!I18N[LANG])LANG='de';
+
+function tr(k){ return I18N[LANG]?.[k] ?? I18N.de[k] ?? k; }
+
+function setText(id,key){
+  const el=document.getElementById(id);
+  if(el)el.textContent=tr(key);
+}
+function setLang(lang){
+  LANG=I18N[lang]?lang:'de';
+  try{localStorage.setItem('fsd_lang',LANG)}catch(e){}
+  applyLanguage();
+}
+function applyLanguage(){
+  document.getElementById('langDE')?.classList.toggle('active',LANG==='de');
+  document.getElementById('langRO')?.classList.toggle('active',LANG==='ro');
+
+  const bl=document.getElementById('btnLocation'); if(bl)bl.textContent='📍 '+tr('my_location');
+  const bf=document.getElementById('btnFeedback'); if(bf)bf.textContent='↓ '+tr('feedback');
+
+  const pTitle=document.querySelector('#planner .ptitle');
+  if(pTitle)pTitle.textContent=tr('planning');
+
+  const labels=document.querySelectorAll('[data-i18n]');
+  labels.forEach(el=>{ const k=el.getAttribute('data-i18n'); if(k)el.textContent=tr(k); });
+
+  const note=document.getElementById('pNote');
+  if(note)note.placeholder=tr('note_placeholder');
+
+  renderObjectLegend();
+
+  const count=document.getElementById('count');
+  if(count)count.textContent=DATA.length+' '+tr('positions');
+
+  const sel=document.getElementById('selCount');
+  if(sel){
+    const n=(sel.textContent.match(/\d+/)||['0'])[0];
+    sel.textContent=n+' '+tr('selected');
+  }
+}
+
+
+// Objektfarben: auf Rechner- und Handykarte identisch.
+const OBJECT_COLORS = {
+  'Baum':'#d62828',
+  'Veg. sonstig':'#f28c28',
+  'Veg sonstig':'#f28c28',
+  'Vegetation sonstig':'#f28c28',
+  'Fläche':'#2563eb',
+  'Flaeche':'#2563eb',
+  'Gehölz':'#7c3aed',
+  'Gehoelz':'#7c3aed',
+  'Hecke':'#16a34a',
+  'Strauch':'#0f9f7a'
+};
+const FALLBACK_OBJECT_COLORS=['#0891b2','#a855f7','#ca8a04','#475569','#be123c','#15803d'];
+
+function objectLabel(x){
+  const v=(x.objekt||x.objekt_typ||x['Objekt Typ']||'Sonstiges').toString().trim();
+  return v || 'Sonstiges';
+}
+function colorForObject(obj){
+  if(OBJECT_COLORS[obj]) return OBJECT_COLORS[obj];
+  // Gleiche unbekannte Bezeichnung erhält immer dieselbe Farbe.
+  let h=0;
+  for(let i=0;i<obj.length;i++) h=((h<<5)-h)+obj.charCodeAt(i);
+  return FALLBACK_OBJECT_COLORS[Math.abs(h)%FALLBACK_OBJECT_COLORS.length];
+}
+function translatedObjectLabel(obj){
+  const raw=(obj||'').toString().trim();
+  const k=raw.toLowerCase();
+  if(k==='baum') return tr('tree');
+  if(k==='fläche' || k==='flaeche') return tr('area');
+  if(k==='veg sonstig' || k==='veg. sonstig' || k==='vegetation sonstig') return tr('other_veg');
+  return raw;
+}
+
+function renderObjectLegend(){
+  const el=document.getElementById('objLegend');
+  if(!el)return;
+  const objs=[...new Set(DATA.map(objectLabel))].sort((a,b)=>a.localeCompare(b,'de'));
+  if(!objs.length){el.style.display='none';return}
+  el.innerHTML=
+    '<div class="lgTitle">'+tr('objects')+'</div>'+
+    objs.map(o=>'<div class="lgRow"><span class="lgDot" style="background:'+colorForObject(o)+'"></span><span>'+esc(translatedObjectLabel(o))+'</span></div>').join('')+
+    '<div style="height:1px;background:#d8dde2;margin:6px 0"></div>'+
+    '<div class="lgTitle">'+tr('status')+'</div>'+
+    '<div class="lgRow"><span class="lgDot" style="background:#16a34a"></span><span>'+tr('done')+'</span></div>'+
+    '<div class="lgRow"><span class="lgDot" style="background:#5b4636"></span><span>'+tr('missing')+'</span></div>'+
+    '<div class="lgRow"><span class="lgDot" style="background:#ffd400;color:#111;text-align:center;font-weight:900;line-height:11px">!</span><span>'+tr('note_present')+'</span></div>';
+}
+
+const STORAGE_KEY='fsd_'+location.pathname+'_'+DATA.map(x=>x.uid||x.nr).join('_').slice(0,180);
+let state={};
+let current=null;
+
+function esc(v){
+  return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function loadState(){
+  try{
+    const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved) state=JSON.parse(saved)||{};
+  }catch(e){}
+  for(const x of DATA){
+    const key=x.uid||String(x.nr);
+    if(!state[key]){
+      state[key]={status:x.status||'Offen',notiz:x.notiz||'',fotos:Array.isArray(x.fotos)?x.fotos:[],tree_notes:{}};
+    }
+    if(!state[key].tree_notes)state[key].tree_notes={};
+  }
+}
+function persist(){
+  try{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+  }catch(e){
+    console.warn(e);
+  }
+}
+loadState();
+
+const map=L.map('map',{
+  dragging:true,touchZoom:true,scrollWheelZoom:true,doubleClickZoom:true,
+  boxZoom:true,keyboard:true,tap:true,zoomControl:false
+});
+L.control.zoom({position:'topright'}).addTo(map);
+
+// Amtliche BVV-Karten. DOP20 bleibt Standard.
+const satellite=L.tileLayer.wms('https://geoservices.bayern.de/od/wms/dop/v1/dop20?',{
+  layers:'by_dop20c',format:'image/jpeg',transparent:false,version:'1.3.0',
+  crs:L.CRS.EPSG3857,maxZoom:23,attribution:'Bayerische Vermessungsverwaltung · DOP20 CC BY 4.0'
+}).addTo(map);
+const topo=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{
+  maxNativeZoom:19,maxZoom:23,attribution:'© OpenStreetMap-Mitwirkende'
+});
+// Transparente Beschriftungen: Esri Reference Layer, keine CARTO-Dienste/API-Schlüssel.
+// Nur über Luftbild sichtbar, oberhalb der Bildkacheln und unter den Baummarkern.
+map.createPane('fsdLabels');map.getPane('fsdLabels').style.zIndex=350;
+map.getPane('fsdLabels').style.pointerEvents='none';
+const labels=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',{
+  pane:'fsdLabels',maxNativeZoom:19,maxZoom:23,opacity:1,
+  attribution:'Beschriftungen © Esri',errorTileUrl:''
+});
+const streetLabels=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',{
+  pane:'fsdLabels',maxNativeZoom:19,maxZoom:23,attribution:'Straßen © Esri'
+});
+function syncLabels(){
+  if(map.hasLayer(satellite)){
+    if(!map.hasLayer(streetLabels))streetLabels.addTo(map);
+    if(!map.hasLayer(labels))labels.addTo(map);
+  }else{
+    if(map.hasLayer(labels))map.removeLayer(labels);
+    if(map.hasLayer(streetLabels))map.removeLayer(streetLabels);
+  }
+}
+map.on('baselayerchange',syncLabels);
+streetLabels.addTo(map);
+labels.addTo(map);
+const parcelsBY=L.tileLayer.wms('https://geoservices.bayern.de/od/wms/alkis/v1/parzellarkarte?',{
+  layers:'by_alkis_parzellarkarte_umr_schwarz',format:'image/png',transparent:true,version:'1.3.0',
+  crs:L.CRS.EPSG3857,maxZoom:23,opacity:.85,attribution:'Bayerische Vermessungsverwaltung · ALKIS'
+});
+const parcelsTH=L.tileLayer.wms('https://www.geoproxy.geoportal-th.de/geoproxy/services/INSPIREcp',{
+  layers:'CP.CadastralParcel',styles:'default',format:'image/png',transparent:true,version:'1.3.0',
+  maxZoom:23,opacity:.85,attribution:'GDI Thüringen · ALKIS'
+});
+L.control.layers(
+  {'Luftbild DOP20':satellite,'Topografisch':topo},
+  {'Flurstücke Bayern':parcelsBY,'Flurstücke Thüringen':parcelsTH},
+  {position:'topright',collapsed:true}
+).addTo(map);
+
+const bounds=[];
+const markerRefs=[];
+const geometryRefs=[];
+const markerByKey={};
+
+function markerClass(status){
+  if(status==='Erledigt') return 'done';
+  if(status==='Nicht gefunden') return 'missing';
+  return '';
+}
+function noteForItem(x){
+  const key=x.uid||String(x.nr);
+  const live=(state[key]?.notiz ?? x.notiz ?? '').toString().trim();
+  return live;
+}
+function makeIcon(x){
+  const key=x.uid||String(x.nr);
+  const st=state[key]?.status||x.status||'Offen';
+  const obj=objectLabel(x);
+  const color=colorForObject(obj);
+  const note=noteForItem(x);
+  const noteHtml=note ? `<div class="noteFlag" title="Notiz vorhanden: ${esc(note)}">!</div>` : '';
+  const statusClass=markerClass(st);
+
+  // Offen: Objektfarbe ist die volle Markerfarbe.
+  // Bearbeitet: Statusfarbe innen, Objektfarbe als Außenrand.
+  let markerStyle=`background:${color};border-color:white;`;
+  if(st==='Erledigt' || st==='Nicht gefunden'){
+    markerStyle=`border:4px solid ${color};line-height:26px;`;
+  }
+
+  return L.divIcon({
+    className:'',
+    html:`<div class="numWrap">
+            <div class="num ${statusClass}" style="${markerStyle}" title="${esc(obj)}">${x.nr}</div>
+            ${noteHtml}
+          </div>`,
+    iconSize:[34,34],iconAnchor:[17,17]
+  });
+}
+function refreshMarker(x){
+  const key=x.uid||String(x.nr);
+  const m=markerByKey[key];
+  if(m){m.setIcon(makeIcon(x)); setTimeout(()=>updatePlanMarker(x,m),0);}
+}
+
+for(const x of DATA){
+  const key=x.uid||String(x.nr);
+  const m=L.marker([x.lat,x.lon],{icon:makeIcon(x),riseOnHover:true,riseOffset:1000}).addTo(map);
+  markerByKey[key]=m;
+
+  m.bindTooltip(`Nr. ${x.nr}`,{
+    permanent:false,direction:'top',offset:[0,-18],className:'numlabel',opacity:1
+  });
+  m.on('mouseover',()=>{
+    const el=m.getElement();
+    if(el){
+      const n=el.querySelector('.num');
+      if(n)n.classList.add('hovered');
+    }
+    m.openTooltip();
+  });
+  m.on('mouseout',()=>{
+    const el=m.getElement();
+    if(el){
+      const n=el.querySelector('.num');
+      if(n)n.classList.remove('hovered');
+    }
+    m.closeTooltip();
+  });
+  m.on('click',(ev)=>{
+    if(ev?.originalEvent?.stopPropagation)ev.originalEvent.stopPropagation();
+    if(PLANNING && window.innerWidth>=800){
+      togglePlanSelection(x,m);
+    }else{
+      openPanel(x);
+    }
+  });
+  m.on('contextmenu',(ev)=>{
+    if(ev?.originalEvent?.preventDefault)ev.originalEvent.preventDefault();
+    if(ev?.originalEvent?.stopPropagation)ev.originalEvent.stopPropagation();
+    openPanel(x);
+  });
+
+  bounds.push([x.lat,x.lon]);
+  markerRefs.push({marker:m,data:x,orig:[x.lat,x.lon]});
+}
+
+// Importierte Geometrien aus dem PC-Projekt: Fläche/Linie zusätzlich zum Mittelpunkt darstellen.
+for(const x of DATA){
+  if(!x.geojson_geometry)continue;
+  try{
+    const gj={type:'Feature',geometry:x.geojson_geometry,properties:x.geojson_properties||{}};
+    const gl=L.geoJSON(gj,{style:()=>({color:'#ff9800',weight:6,fillColor:'#ff9800',fillOpacity:.22})}).addTo(map);
+    gl.on('click',(ev)=>{try{L.DomEvent.stopPropagation(ev.originalEvent)}catch(e){} openPanel(x);});
+    gl.bindTooltip(`${esc(x.strecke||'')} ${esc(x.von_km||x.km||'')}${x.bis_km?'–'+esc(x.bis_km):''}`,{sticky:true});
+    geometryRefs.push({layer:gl,data:x});
+    try{const b=gl.getBounds();if(b.isValid()){bounds.push(b.getSouthWest());bounds.push(b.getNorthEast())}}catch(e){}
+  }catch(e){}
+}
+
+function isMarkerVisible(ref){
+  return map.hasLayer(ref.marker);
+}
+
+let layoutTimer=null;
+
+function resetMarkerPositions(){
+  markerRefs.forEach(ref=>{
+    if(isMarkerVisible(ref))ref.marker.setLatLng(ref.orig);
+  });
+}
+
+function screenClusters(refs, thresholdPx){
+  const pts=refs.map(ref=>({
+    ref,
+    p:map.latLngToLayerPoint(ref.orig)
+  }));
+  const used=new Set();
+  const out=[];
+
+  for(let i=0;i<pts.length;i++){
+    if(used.has(i))continue;
+    const cluster=[];
+    const queue=[i];
+    used.add(i);
+
+    while(queue.length){
+      const a=queue.shift();
+      cluster.push(pts[a]);
+      for(let j=0;j<pts.length;j++){
+        if(used.has(j))continue;
+        const dx=pts[a].p.x-pts[j].p.x;
+        const dy=pts[a].p.y-pts[j].p.y;
+        if(Math.sqrt(dx*dx+dy*dy)<thresholdPx){
+          used.add(j);
+          queue.push(j);
+        }
+      }
+    }
+    out.push(cluster);
+  }
+  return out;
+}
+
+function spreadCluster(cluster, radius){
+  if(cluster.length<=1)return;
+
+  // Mittelpunkt bleibt direkt am tatsächlichen Arbeitsbereich.
+  const cx=cluster.reduce((s,v)=>s+v.p.x,0)/cluster.length;
+  const cy=cluster.reduce((s,v)=>s+v.p.y,0)/cluster.length;
+  const n=cluster.length;
+
+  cluster.forEach((entry,i)=>{
+    const angle=(Math.PI*2*i/n)-Math.PI/2;
+    const p=L.point(
+      cx+Math.cos(angle)*radius,
+      cy+Math.sin(angle)*radius
+    );
+    entry.ref.marker.setLatLng(map.layerPointToLatLng(p));
+  });
+}
+
+function autoLayoutMarkers(){
+  if(layoutTimer)clearTimeout(layoutTimer);
+  layoutTimer=setTimeout(()=>{
+    // Grundsätzlich immer die echten GPS-Positionen verwenden.
+    resetMarkerPositions();
+
+    const zoom=map.getZoom();
+    const visible=markerRefs.filter(isMarkerVisible);
+
+    // Weit draußen: keine künstliche Auffächerung.
+    // Die Karte soll zeigen, wo die Arbeitsbereiche wirklich liegen.
+    if(zoom < 16){
+      markerRefs.forEach(ref=>updatePlanMarker(ref.data,ref.marker));
+      return;
+    }
+
+    // Erst beim deutlichen Reinzoomen kleine Überlagerungen automatisch lösen.
+    // Je weiter hineingezoomt wird, desto mehr Platz darf zwischen den Nummern entstehen.
+    const threshold = zoom >= 18 ? 30 : (zoom >= 17 ? 25 : 20);
+    const clusters=screenClusters(visible,threshold);
+
+    clusters.forEach(cluster=>{
+      if(cluster.length<=1)return;
+
+      // Nur eng überlappende Marker minimal versetzen.
+      // Kein großer Ring und keine Verschiebung über den eigentlichen Standort hinaus.
+      let radius;
+      if(zoom >= 18){
+        radius = cluster.length<=3 ? 20 : (cluster.length<=6 ? 26 : 32);
+      }else if(zoom >= 17){
+        radius = cluster.length<=3 ? 17 : (cluster.length<=6 ? 22 : 27);
+      }else{
+        radius = cluster.length<=3 ? 14 : (cluster.length<=6 ? 18 : 22);
+      }
+      spreadCluster(cluster,radius);
+    });
+
+    markerRefs.forEach(ref=>updatePlanMarker(ref.data,ref.marker));
+  },35);
+}
+
+map.on('zoomend moveend resize',autoLayoutMarkers);
+
+function renderInspection(x){
+  const fields=[
+    ['Inspektion',x.inspektion],
+    ['Seite',x.rkz],['Abstand Gleismitte',x.abstand_gleis?x.abstand_gleis+' m':''],
+    ['Anzahl',x.anzahl],['BHD',x.bhd],['Höhe',x.hoehe?x.hoehe+' m':''],
+    ['Art 1',x.art1],['Art 2',x.art2],['Art 3',x.art3],['Belaubung',x.belaubung],
+    ['Eigentümer',x.eigentuemer],['VSP',x.vsp],['Befund',x.befund],
+    ['Umsetzung',x.massnahmenumsetzung],['Maschine',x.maschine],['Dringlichkeit',x.dringlichkeit],
+    ['Aufnahmejahr',x.aufnahmejahr]
+  ].filter(z=>String(z[1]??'').trim()!=='');
+  const block=document.getElementById('inspectionBlock'), el=document.getElementById('pInspection');
+  if(!fields.length){block.style.display='none';el.innerHTML='';return;}
+  block.style.display='block';
+  el.innerHTML=fields.map(z=>`<span class="badge"><b>${esc(z[0])}:</b> ${esc(z[1])}</span>`).join(' ')+
+    (x._display_offset_default?'<div style="font-size:11px;color:#666;margin-top:4px">rdB/ldB ohne Abstand: Linie/Punkt nur zur Darstellung um 4 m versetzt.</div>':'');
+}
+function saveTreeNote(species,value){
+  if(!current)return; const key=currentKey();
+  if(!state[key].tree_notes)state[key].tree_notes={};
+  state[key].tree_notes[species]=value; persist();
+}
+function renderTreeNotes(x){
+  let arr=[x.art1,x.art2,x.art3].map(v=>String(v||'').trim()).filter(Boolean);
+  if(!arr.length && x.baumart)arr=String(x.baumart).split(/[,;/]+/).map(v=>v.trim()).filter(Boolean);
+  arr=[...new Set(arr)];
+  const block=document.getElementById('treeNotesBlock'),el=document.getElementById('pTreeNotes');
+  if(!arr.length || arr.some(v=>v.toLowerCase()==='bäume und sträucher')){block.style.display='none';el.innerHTML='';return;}
+  const notes=state[currentKey()]?.tree_notes||{};
+  block.style.display='block';
+  el.innerHTML=arr.map(sp=>`<div style="margin:5px 0"><b>${esc(sp)}</b><br><input style="width:100%;box-sizing:border-box;padding:7px;border:1px solid #bbb;border-radius:7px" value="${esc(notes[sp]||'')}" placeholder="z. B. Hebebühne / Klettern / geht so" oninput="saveTreeNote(${JSON.stringify(sp)},this.value)"></div>`).join('');
+}
+
+function openPanel(x){
+  current=x;
+  const key=x.uid||String(x.nr);
+  const st=state[key];
+  const km=x.von_km&&x.bis_km?`${x.von_km}–${x.bis_km}`:(x.km||'');
+  document.getElementById('pTitle').textContent=`Nr. ${x.nr}`;
+  document.getElementById('pSub').textContent=x.objekt_typ||'';
+  document.getElementById('pBadges').innerHTML=
+    `<span class="badge">${esc(x.objekt_typ||'')}</span><span class="badge">${esc(st.status)}</span>`;
+  document.getElementById('pBezirk').textContent=x.netzbezirk||'';
+  document.getElementById('pStrecke').textContent=`${x.strecke||''} / ${km}`;
+  document.getElementById('pBaumart').textContent=x.baumart||'';
+  document.getElementById('baumartRow').style.display=x.baumart?'block':'none';
+  document.getElementById('pMassnahme').textContent=x.massnahme||'';
+  document.getElementById('pGrund').textContent=x.grund||x.befund||'';
+  renderInspection(x);
+  renderTreeNotes(x);
+  document.getElementById('pTrupp').textContent=x.trupp||'';
+  document.getElementById('pQuelle').textContent=x.quelle||'';
+  const maps=document.getElementById('pMaps');
+  maps.href=x.link||'#';
+  maps.style.display=x.link?'inline-block':'none';
+  document.getElementById('pNote').value=st.notiz||'';
+  updateStatusButtons(st.status);
+  renderPhotos();
+  document.getElementById('panel').classList.add('open');
+  if(window.innerWidth>=900)document.getElementById('map').classList.add('panel-open');
+}
+function closePanel(){
+  document.getElementById('panel').classList.remove('open');
+  document.getElementById('map').classList.remove('panel-open');
+  current=null;
+}
+function saveAndClose(){
+  saveNote();
+  persist();
+  closePanel();
+}
+function currentKey(){
+  return current?(current.uid||String(current.nr)):null;
+}
+function updateStatusButtons(status){
+  for(const id of ['sOpen','sDone','sMissing'])document.getElementById(id).classList.remove('active');
+  if(status==='Erledigt')document.getElementById('sDone').classList.add('active');
+  else if(status==='Nicht gefunden')document.getElementById('sMissing').classList.add('active');
+  else document.getElementById('sOpen').classList.add('active');
+}
+function setStatus(status){
+  if(!current)return;
+  const key=currentKey();
+  state[key].status=status;
+  persist();
+  updateStatusButtons(status);
+  document.getElementById('pBadges').innerHTML=
+    `<span class="badge">${esc(current.objekt_typ||'')}</span><span class="badge">${esc(status)}</span>`;
+  refreshMarker(current);
+}
+function saveNote(){
+  if(!current)return;
+  state[currentKey()].notiz=document.getElementById('pNote').value;
+  persist();
+  refreshMarker(current);
+}
+
+function compressImage(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=reject;
+      img.onload=()=>{
+        const max=1280;
+        let w=img.width,h=img.height;
+        if(w>max||h>max){
+          const scale=Math.min(max/w,max/h);
+          w=Math.round(w*scale);h=Math.round(h*scale);
+        }
+        const c=document.createElement('canvas');
+        c.width=w;c.height=h;
+        c.getContext('2d').drawImage(img,0,0,w,h);
+        resolve({name:file.name||'Foto.jpg',data:c.toDataURL('image/jpeg',0.76)});
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+async function addPhotos(files,inputId){
+  if(!current||!files?.length)return;
+  const key=currentKey();
+  for(const f of files){
+    try{
+      state[key].fotos.push(await compressImage(f));
+    }catch(e){
+      alert('Foto konnte nicht verarbeitet werden.');
+    }
+  }
+  persist();
+  renderPhotos();
+  if(inputId && document.getElementById(inputId))document.getElementById(inputId).value='';
+}
+function deletePhoto(index){
+  if(!current)return;
+  state[currentKey()].fotos.splice(index,1);
+  persist();
+  renderPhotos();
+}
+function renderPhotos(){
+  if(!current)return;
+  const arr=state[currentKey()].fotos||[];
+  document.getElementById('photoCount').textContent=`${arr.length}`;
+  document.getElementById('photos').innerHTML=arr.map((p,i)=>
+    `<div class="photo"><img src="${p.data}" alt="Foto"><button onclick="deletePhoto(${i})">✕</button></div>`
+  ).join('');
+}
+
+function exportFeedback(){
+  const items=DATA.map(x=>{
+    const key=x.uid||String(x.nr);
+    const st=state[key]||{};
+    return {
+      uid:x.uid||'',
+      nr:x.nr,
+      strecke:x.strecke||'',
+      km:x.km||'',
+      be_nr:x.be_nr||'', obj_nr:x.obj_nr||'', lat:x.lat, lon:x.lon,
+      status:st.status||'Offen',
+      notiz:st.notiz||'',
+      tree_notes:st.tree_notes||{},
+      fotos:Array.isArray(st.fotos)?st.fotos:[]
+    };
+  });
+  const payload={
+    type:'FSD_HANDYKARTE_RUECKMELDUNG',
+    version:1,
+    title:'FSD Handykarte',
+    exported:new Date().toISOString(),
+    items
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='FSD_Rueckmeldung_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+
+
+
+const mapFilterIds={
+  netzbezirk:'fBezirk',
+  inspektion:'fInspektion',
+  strecke:'fStrecke',
+  objekt_typ:'fObjekt',
+  status:'fStatus',
+  trupp:'fTrupp'
+};
+
+function statusOf(x){
+  const key=x.uid||String(x.nr);
+  return state[key]?.status||x.status||'Offen';
+}
+function filterValue(x,key){
+  if(key==='status')return statusOf(x);
+  return String(x[key]??'').trim();
+}
+function fillSelect(id,values){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const current=el.value||'Alle';
+  const vals=['Alle',...Array.from(new Set(values.filter(v=>String(v).trim()).map(v=>String(v).trim())))
+    .sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))];
+  el.innerHTML=vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  if(vals.includes(current))el.value=current;
+}
+function rebuildMapFilterOptions(){
+  fillSelect('fBezirk',DATA.map(x=>x.netzbezirk||''));
+  fillSelect('fInspektion',DATA.map(x=>x.inspektion??''));
+  fillSelect('fStrecke',DATA.map(x=>x.strecke||''));
+  fillSelect('fObjekt',DATA.map(x=>x.objekt_typ||''));
+  fillSelect('fStatus',DATA.map(statusOf));
+  fillSelect('fTrupp',DATA.map(x=>x.trupp||''));
+}
+function matchesMapFilters(x){
+  for(const [key,id] of Object.entries(mapFilterIds)){
+    const el=document.getElementById(id);
+    if(!el||el.value==='Alle')continue;
+    if(filterValue(x,key)!==el.value)return false;
+  }
+  return true;
+}
+function applyMapFilters(){
+  let visible=0;
+  markerRefs.forEach(ref=>{
+    if(matchesMapFilters(ref.data)){
+      if(!map.hasLayer(ref.marker))ref.marker.addTo(map);
+      visible++;
+    }else{
+      if(map.hasLayer(ref.marker))map.removeLayer(ref.marker);
+    }
+  });
+  geometryRefs.forEach(ref=>{
+    if(matchesMapFilters(ref.data)){
+      if(!map.hasLayer(ref.layer))ref.layer.addTo(map);
+    }else{
+      if(map.hasLayer(ref.layer))map.removeLayer(ref.layer);
+    }
+  });
+  const vc=document.getElementById('viewCount');
+  if(vc)vc.textContent='· '+visible+' sichtbar';
+  autoLayoutMarkers();
+}
+function resetMapFilters(){
+  Object.values(mapFilterIds).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.value='Alle';
+  });
+  applyMapFilters();
+}
+
+const planSelection=new Set();
+
+function planKey(x){return x.uid||String(x.nr)}
+function updatePlanMarker(x,m){
+  const el=m.getElement();
+  if(!el)return;
+  const n=el.querySelector('.num');
+  if(!n)return;
+  if(planSelection.has(planKey(x)))n.classList.add('selected');
+  else n.classList.remove('selected');
+}
+function togglePlanSelection(x,m){
+  const k=planKey(x);
+  if(planSelection.has(k))planSelection.delete(k); else planSelection.add(k);
+  updatePlanMarker(x,m);
+  document.getElementById('selCount').textContent=planSelection.size+' '+tr('selected');
+  autoLayoutMarkers();
+}
+function selectAllPositions(){
+  DATA.forEach(x=>planSelection.add(planKey(x)));
+  markerRefs.forEach(r=>updatePlanMarker(r.data,r.marker));
+  document.getElementById('selCount').textContent=planSelection.size+' '+tr('selected');
+  autoLayoutMarkers();
+}
+function clearSelection(){
+  planSelection.clear();
+  markerRefs.forEach(r=>updatePlanMarker(r.data,r.marker));
+  document.getElementById('selCount').textContent='0 ausgewählt';
+}
+function assignSelectedToTrupp(){
+  const t=document.getElementById('planTrupp').value.trim();
+  if(!t){alert(tr('enter_crew'));return}
+  if(!planSelection.size){alert(tr('select_points'));return}
+  DATA.forEach(x=>{if(planSelection.has(planKey(x)))x.trupp=t});
+  rebuildMapFilterOptions();
+  markerRefs.forEach(ref=>refreshMarker(ref.data));
+  clearSelection();
+  autoLayoutMarkers();
+  alert('Positionen wurden '+t+' zugewiesen.');
+}
+function currentTruppItems(){
+  const t=document.getElementById('planTrupp').value.trim();
+  if(!t)return [];
+  return DATA.filter(x=>(x.trupp||'')===t);
+}
+function downloadCurrentTruppMap(){
+  const t=document.getElementById('planTrupp').value.trim();
+  if(!t){alert('Bitte Truppnamen eingeben.');return}
+  const subset=currentTruppItems();
+  if(!subset.length){alert(tr('no_positions'));return}
+  exportTruppPlan();
+  alert(tr('saved_plan'));
+}
+
+function exportTruppPlan(){
+  const payload={
+    type:'FSD_TRUPPPLANUNG',
+    version:1,
+    exported:new Date().toISOString(),
+    items:DATA.map(x=>({uid:x.uid||'',nr:x.nr,trupp:x.trupp||''}))
+  };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='FSD_Truppplanung_'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+if(PLANNING){
+  document.getElementById('planner').classList.add('open');
+  rebuildMapFilterOptions();
+}else{
+  const planner=document.getElementById('planner');
+  if(planner)planner.remove();
+}
+
+renderObjectLegend();
+applyLanguage();
+document.getElementById('count').textContent=DATA.length+' '+tr('positions');
+if(bounds.length){
+  map.fitBounds(bounds,{padding:[90,45]});
+}else{
+  map.setView([48.13,11.54],13);
+}
+setTimeout(()=>{
+  if(PLANNING)applyMapFilters();
+  else autoLayoutMarkers();
+},250);
+
+let userLocationMarker=null;
+
+function locateMe(){
+  const localMode=(location.protocol==='file:' || location.protocol==='content:');
+  const secureOK=(window.isSecureContext || location.hostname==='localhost' || location.hostname==='127.0.0.1');
+  if(localMode || !secureOK){ locationFallback(tr('local_location_blocked')); return; }
+  if(!navigator.geolocation){ alert(tr('location_unsupported')); return; }
+  // Läuft die Ortung bereits, dient der Button nur als Fadenkreuz: zurück zum aktuellen Standort.
+  if(window.fsdLastLocation){ map.setView(window.fsdLastLocation,17); return; }
+  if(window.fsdWatchId!==undefined && window.fsdWatchId!==null) return;
+  window.fsdWatchId=navigator.geolocation.watchPosition(
+    p=>{
+      const ll=[p.coords.latitude,p.coords.longitude];
+      window.fsdLastLocation=ll;
+      if(!userLocationMarker){
+        userLocationMarker=L.circleMarker(ll,{radius:9,weight:3,color:'#17365d',fillColor:'#38bdf8',fillOpacity:.9}).addTo(map).bindPopup(tr('location_here'));
+        map.setView(ll,17);
+      }else{ userLocationMarker.setLatLng(ll); }
+    },
+    err=>{let reason=tr('location_failed');if(err&&err.code===1)reason=tr('location_denied');alert(reason);},
+    {enableHighAccuracy:true,timeout:15000,maximumAge:3000}
+  );
+}
+
+function locationFallback(reason){
+  const openMaps=confirm(reason+'\n\n'+tr('open_google_maps'));
+  if(openMaps){
+    window.open('https://www.google.com/maps','_blank');
+  }
+}
+</script>
+</body>
+</html>

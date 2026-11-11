@@ -1,0 +1,32 @@
+<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FSD Handykarte Live</title><style>body{margin:0;font:14px Arial;background:#eef2f4}#top{background:#152c24;color:white;padding:10px}#map{width:100%;height:calc(100dvh - 45px);border:0}#msg{padding:15px}</style><div id="top">FSD Handykarte · <span id="name">Laden …</span></div><div id="msg">Karte wird geladen …</div><iframe id="map" sandbox="allow-scripts allow-forms allow-modals allow-downloads" referrerpolicy="no-referrer" hidden></iframe><script>
+const ENDPOINT='https://ermkdluipeobbpzuqixz.supabase.co/functions/v1/handykarte-api';
+const token=new URLSearchParams(location.search).get('t');
+async function api(action,data={}){const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,token,...data})});const j=await r.json();if(!r.ok)throw Error(j.error||'Netzwerkfehler');return j}
+(async()=>{try{const {html,name}=await api('map');document.getElementById('name').textContent=name;
+// This script runs in the sandboxed map and keeps the existing map design unchanged.
+const bridge=`<script>
+(function(){
+ const ENDPOINT=${JSON.stringify(ENDPOINT)},token=${JSON.stringify(token)};
+ const api=async(action,data={})=>{const r=await fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,token,...data})});const j=await r.json();if(!r.ok)throw Error(j.error||'Sync fehlgeschlagen');return j};
+ let applying=false,latest={},dirty=new Set(),busy=false;
+ const oldPersist=persist;
+ persist=function(){oldPersist();if(applying)return;const key=currentKey();if(key){dirty.add(key);flush();}};
+ async function flush(){if(busy||!dirty.size)return;busy=true;
+  try{while(dirty.size){const key=dirty.values().next().value;dirty.delete(key);const s=state[key];if(!s)continue;
+   try{await api('save',{point_key:key,status:s.status,notiz:s.notiz,fotos:s.fotos});}catch(e){dirty.add(key);console.warn(e.message);break;}
+  }}finally{busy=false}}
+ async function refresh(){try{const {updates}=await api('list');applying=true;
+  for(const u of updates){if(dirty.has(u.point_key))continue;const old=latest[u.point_key];if(old===u.updated_at)continue;latest[u.point_key]=u.updated_at;
+   if(!state[u.point_key])continue;
+   Object.assign(state[u.point_key],{status:u.status,notiz:u.notiz,fotos:u.fotos||[]});
+   const x=DATA.find(x=>(x.uid||String(x.nr))===u.point_key);if(x)refreshMarker(x);
+   if(currentKey()===u.point_key){updateStatusButtons(u.status);document.getElementById('pNote').value=u.notiz;renderPhotos();}
+  }oldPersist();}catch(e){console.warn('Live Sync:',e.message)}finally{applying=false}}
+ refresh();setInterval(refresh,2500);setInterval(flush,4000);
+})();
+<\/script>`;
+ const output=html.replace(/<\/body\s*>/i,bridge+'</body>');
+ if(output===html)throw Error('HTML-Karte hat kein body-Ende');
+ document.getElementById('map').srcdoc=output;document.getElementById('map').hidden=false;document.getElementById('msg').hidden=true;
+ }catch(e){document.getElementById('msg').textContent='Karte konnte nicht geöffnet werden: '+e.message}})();
+</script></html>

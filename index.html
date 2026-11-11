@@ -95,7 +95,7 @@ async function loadMaps(){
    tr.innerHTML=`<td><b>${esc(c.name)}</b><div class="muted">${isFsdHtmlCard(c)?'FSD-Handykarte / HTML':isPointCard(c)?'Anlagen / Positionen':'Flughafen / Flächen'}</div></td><td><span class="badge ${c.status==='draft'?'draft':'released'}">${status}</span></td><td><b>${open}</b></td><td><b>${done}</b></td><td class="hide-mobile">${total}</td><td class="hide-mobile">${esc(c.recipient||'–')}</td><td></td>`;
    let td=tr.lastElementChild;
    if(isFsdHtmlCard(c))btn(td,'Ansehen','secondary',()=>openFsdHtmlCard(c.id));else if(isPointCard(c))btn(td,'Ansehen','secondary',()=>viewPointCard(c));
-   if(isFsdHtmlCard(c)){btn(td,'Link kopieren','primary',()=>shareFsdHtmlCard(c.id));btn(td,'HTML ersetzen','secondary',()=>replaceFsdHtmlCard(c.id));}else if(c.status==='draft'){btn(td,'Bearbeiten','secondary',()=>editCard(c.id));btn(td,'Freigeben','primary',()=>releaseCard(c.id));}
+   if(isFsdHtmlCard(c)){btn(td,'Live-Link erstellen','primary',()=>shareFsdHtmlCard(c.id));btn(td,'HTML ersetzen','secondary',()=>replaceFsdHtmlCard(c.id));}else if(c.status==='draft'){btn(td,'Bearbeiten','secondary',()=>editCard(c.id));btn(td,'Freigeben','primary',()=>releaseCard(c.id));}
    else if(!isFsdHtmlCard(c)){btn(td,'Teilen','primary',()=>shareCard(c.id));btn(td,'Neue Version','secondary',()=>duplicateCard(c.id));}
    btn(td,'Löschen','secondary',()=>trashCard(c.id));
    tb.appendChild(tr);
@@ -170,9 +170,17 @@ async function trashCard(id){if(!confirm('Karte in den Papierkorb verschieben?')
 // Zusätzliche FSD-HTML-Karten; bestehende Flughafen-/50Hz-Logik bleibt unberührt.
 function isFsdHtmlCard(c){return c?.filters?.fsd_type==='html_handykarte'}
 function cloudBase(){return new URL('./',location.href).href}
+const FSD_LIVE_API='https://ermkdluipeobbpzuqixz.supabase.co/functions/v1/handykarte-api';
 async function shareFsdHtmlCard(id){
- const link=cloudBase()+'fsd-handykarte-viewer.html?id='+encodeURIComponent(id);
- try{await navigator.clipboard.writeText(link);alert('Link kopiert. Der Empfänger muss sich mit einem freigeschalteten Supabase-Konto anmelden.\n'+link)}catch{prompt('Link kopieren (Anmeldung erforderlich):',link)}
+ if(!confirm('Neuen passwortlosen Freigabelink erstellen? Ein bisheriger Link für diese Karte wird dadurch ungültig.'))return;
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session){alert('Bitte anmelden.');return}
+ try{
+  const r=await fetch(FSD_LIVE_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'create',map_id:id})});
+  const d=await r.json();if(!r.ok)throw Error(d.error||'Freigabe fehlgeschlagen');
+  const link=cloudBase()+'fsd-handykarte-live.html?t='+encodeURIComponent(d.token);
+  try{await navigator.clipboard.writeText(link);alert('Passwortloser Link kopiert. Nur an berechtigte Trupps weitergeben.')}catch{prompt('Freigabelink kopieren:',link)}
+ }catch(e){alert('Freigabe fehlgeschlagen: '+e.message+'\nEdge Function zuerst bereitstellen.')}
 }
 function openFsdHtmlCard(id){window.open('fsd-handykarte-viewer.html?id='+encodeURIComponent(id),'_blank','noopener')}
 async function replaceFsdHtmlCard(id){
