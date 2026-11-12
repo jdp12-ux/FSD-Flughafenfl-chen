@@ -67,6 +67,19 @@ async function logout(){await sb.auth.signOut();showSession(null)}
 function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function btn(td,label,cls,fn){let b=document.createElement('button');b.className=cls;b.textContent=label;b.style.margin='2px';b.onclick=fn;td.appendChild(b)}
 
+const FSD_API='https://ermkdluipeobbpzuqixz.supabase.co/functions/v1/handykarte-api';
+async function fsdManagerUpdates(ids){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session)return {data:[],error:{message:'Anmeldung abgelaufen'}};
+ try{
+  const results=await Promise.all(ids.map(async map_id=>{
+   const r=await fetch(FSD_API,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({action:'manager_list',map_id})});
+   const j=await r.json();if(!r.ok)throw Error(j.error||'Serverfehler '+r.status);
+   return (j.updates||[]).map(u=>({...u,map_id}));
+  }));
+  return {data:results.flat(),error:null};
+ }catch(e){return {data:[],error:{message:e.message}}}
+}
 async function loadMaps(){
  const {data,error}=await sb.from('maps').select('*').is('deleted_at',null).order('created_at',{ascending:false});
  if(error){alert(error.message);return}
@@ -83,9 +96,9 @@ async function loadMaps(){
   const htmlUpdates=new Map();
   const htmlCounts=new Map();
   if(htmlIds.length){
-    const r=await sb.from('fsd_handykarte_updates').select('map_id,point_key,status').in('map_id',htmlIds);
+    const r=await fsdManagerUpdates(htmlIds);
     if(r.error){
-      document.getElementById('dashboardMsg').textContent='Handykarten-Rückmeldungen konnten nicht gelesen werden: '+r.error.message+' (SELECT-Berechtigung/RLS prüfen).';
+      document.getElementById('dashboardMsg').textContent='Handykarten-Rückmeldungen konnten nicht gelesen werden: '+r.error.message+' (Edge Function prüfen).';
     }else{
       for(const row of r.data||[]){
         if(!htmlUpdates.has(row.map_id))htmlUpdates.set(row.map_id,new Map());
